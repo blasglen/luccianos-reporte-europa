@@ -20,24 +20,26 @@ from datetime import datetime, timedelta
 import openpyxl
 
 # --- Configuracion de sucursales -------------------------------------------------
-# Mapea las filas crudas del Excel (7 venues) a las 6 sucursales consolidadas del mail.
-# Las dos Vineland se suman en una sola.
-VENUE_MAP = {
-    "#001 Florida Mall Orlando FL": "Florida Mall",
-    "#004 Weston Town Center FL": "Weston",
-    "#005 Vineland Orlando FL": "Vineland",
-    "Lucciano's Vineland 2026": "Vineland",
-    "#002 American Dream Mall NJ": "American Dream",
-    "#003 Sawgrass Mills Mall FL": "Sawgrass",
-    "#006 Aventura, FL": "Aventura",
-}
+# fetch_cierres.py ya consolido los ~17 PDF en los 9 locales canonicos y dejo el
+# Ventas_ayer.xlsx con esos nombres. Aca el mapeo es identidad: cada local es el
+# suyo. Si aparece uno que no esta, revienta (igual que el "venue desconocido" de USA).
+VENUE_MAP = {b: b for b in [
+    "Barcelona 1", "Barcelona 2", "Madrid", "Roma",
+    "Málaga 1", "Málaga 3", "Valencia", "Alicante", "Granada",
+]}
 
-# Orden de aparicion en la tabla de detalle
-BRANCH_ORDER = ["Florida Mall", "Weston", "Vineland", "American Dream", "Sawgrass", "Aventura"]
+# Orden de aparicion en la tabla de detalle (propias primero, franquicias despues)
+BRANCH_ORDER = ["Barcelona 1", "Barcelona 2", "Madrid", "Roma",
+                "Málaga 1", "Málaga 3", "Valencia", "Alicante", "Granada"]
 
-# Sucursales "PROPIAS" y "FRANQUICIAS"
-PROPIAS = ["Florida Mall", "Weston", "Vineland"]
-FRANQUICIAS = ["American Dream", "Sawgrass", "Aventura"]
+# Sucursales "PROPIAS" y "FRANQUICIAS" (clasificacion 2026)
+PROPIAS = ["Barcelona 1", "Barcelona 2", "Madrid", "Roma"]
+FRANQUICIAS = ["Málaga 1", "Málaga 3", "Valencia", "Alicante", "Granada"]
+
+# Locales SIN historico 2025 (abrieron en 2026): no tienen contra que compararse.
+# Se muestran con "—" y "s/ comp." y quedan FUERA del calculo de la variacion %
+# (pero su venta 2026 SI suma al total, es plata real que entro).
+SIN_HISTORICO_2025 = {"Madrid", "Alicante"}
 
 MESES_ES = {
     1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO",
@@ -107,7 +109,9 @@ def save_accumulator(path, data):
 
 
 def money(v):
-    return f"${v:,.2f}"
+    # Formato europeo: 28.975,69 €  (punto de miles, coma decimal, simbolo al final)
+    s = f"{v:,.2f}".replace(",", "·").replace(".", ",").replace("·", ".")
+    return f"{s} €"
 
 
 def build_report(ventas_path, acum25_path, acum_state_path):
@@ -171,28 +175,41 @@ def build_report(ventas_path, acum25_path, acum_state_path):
     for b in BRANCH_ORDER:
         d = venta_dia[b]
         a26 = acum26[b]
-        a25 = acum25[b]
-        diff = a26 - a25
-        pct = (diff / a25 * 100) if a25 else 0.0
-        rows.append({"branch": b, "dia": d, "a26": a26, "a25": a25, "diff": diff, "pct": pct})
+        comparable = b not in SIN_HISTORICO_2025
+        if comparable:
+            a25 = acum25[b]
+            diff = a26 - a25
+            pct = (diff / a25 * 100) if a25 else 0.0
+        else:
+            # Local nuevo: no existia en 2025. No hay variacion posible.
+            a25 = None
+            diff = None
+            pct = None
+        rows.append({"branch": b, "dia": d, "a26": a26, "a25": a25,
+                     "diff": diff, "pct": pct, "comparable": comparable})
 
-    totals = {
-        "dia": sum(r["dia"] for r in rows),
-        "a26": sum(r["a26"] for r in rows),
-        "a25": sum(r["a25"] for r in rows),
-    }
-    totals["diff"] = totals["a26"] - totals["a25"]
-    totals["pct"] = (totals["diff"] / totals["a25"] * 100) if totals["a25"] else 0.0
+    def _agregar(grupo):
+        """Suma un grupo de locales. La VENTA (dia/a26/a25) es real: incluye a los
+        nuevos. La VARIACION se calcula SOLO sobre comparables (apples-to-apples),
+        asi Madrid/Alicante no inflan el %. 'hay_nuevo' prende la nota al pie."""
+        elegidos = [r for r in rows if r["branch"] in grupo]
+        comp = [r for r in elegidos if r["comparable"]]
+        s = {
+            "dia": sum(r["dia"] for r in elegidos),
+            "a26": sum(r["a26"] for r in elegidos),
+            "a25": sum((r["a25"] or 0.0) for r in elegidos),
+            "hay_nuevo": any(not r["comparable"] for r in elegidos),
+        }
+        comp_a26 = sum(r["a26"] for r in comp)
+        comp_a25 = sum(r["a25"] for r in comp)
+        s["diff"] = comp_a26 - comp_a25
+        s["pct"] = (s["diff"] / comp_a25 * 100) if comp_a25 else 0.0
+        return s
+
+    totals = _agregar(BRANCH_ORDER)
 
     def subtotal(grupo):
-        s = {
-            "dia": sum(r["dia"] for r in rows if r["branch"] in grupo),
-            "a26": sum(r["a26"] for r in rows if r["branch"] in grupo),
-            "a25": sum(r["a25"] for r in rows if r["branch"] in grupo),
-        }
-        s["diff"] = s["a26"] - s["a25"]
-        s["pct"] = (s["diff"] / s["a25"] * 100) if s["a25"] else 0.0
-        return s
+        return _agregar(grupo)
 
     propias = subtotal(PROPIAS)
     franquicias = subtotal(FRANQUICIAS)
@@ -229,25 +246,38 @@ def render_html(fecha, rows, totals, propias, franquicias):
     a26_lbl = f"ACUM. {mes.upper()}/{anio_corto}"
     a25_lbl = f"ACUM. {mes.upper()}/{anio_ant}"
 
-    def chip(pct, diff):
+    def chip(pct, diff, nota=False):
         up = pct >= 0
         col = "#1a7d2e" if up else "#c62828"
         bg = "#eaf5ec" if up else "#fbecec"
         s = "+" if up else ""
+        ast = "*" if nota else ""
         dd = f"(+{money(diff)})" if diff >= 0 else f"({money(diff)})"
         return (f'<span style="display:inline-block;background:{bg};color:{col};'
                 f'font-weight:700;font-size:12px;padding:3px 9px;border-radius:20px;white-space:nowrap;">'
-                f'{s}{pct:.1f}%</span>'
+                f'{s}{pct:.1f}%{ast}</span>'
                 f'<div style="color:{col};font-size:11px;margin-top:3px;">{dd}</div>')
 
+    def chip_sc():
+        # "sin comparable": local nuevo, no existia en 2025. Cartelito gris neutro.
+        return ('<span style="display:inline-block;background:#eeeeee;color:#8a8a8a;'
+                'font-weight:700;font-size:12px;padding:3px 9px;border-radius:20px;white-space:nowrap;">'
+                's/ comp.</span>')
+
     def fila(r, zebra):
+        if r["comparable"]:
+            a25_cell = money(r["a25"])
+            var_cell = chip(r["pct"], r["diff"])
+        else:
+            a25_cell = "—"
+            var_cell = chip_sc()
         return f"""
         <tr style="background:{zebra};">
           <td style="padding:14px 18px;font-weight:700;color:#111111;font-size:14px;">{r['branch']}</td>
           <td style="padding:14px 12px;text-align:right;color:#111111;font-size:14px;">{money(r['dia'])}</td>
           <td style="padding:14px 12px;text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
-          <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25'])}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(r['pct'], r['diff'])}</td>
+          <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{a25_cell}</td>
+          <td style="padding:14px 18px;text-align:right;">{var_cell}</td>
         </tr>"""
 
     def encabezado_grupo(nombre):
@@ -263,8 +293,18 @@ def render_html(fecha, rows, totals, propias, franquicias):
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['dia'])}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['a26'])}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#7a8aa5;font-size:13px;">{money(s['a25'])}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'])}</td>
+          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'], nota=s.get('hay_nuevo'))}</td>
         </tr>"""
+
+    # Nota al pie automatica: aparece sola si algun local no tiene comparable 2025.
+    nuevos = [r["branch"] for r in rows if not r["comparable"]]
+    if nuevos:
+        lista = " y ".join(nuevos) if len(nuevos) <= 2 else ", ".join(nuevos[:-1]) + " y " + nuevos[-1]
+        nota_pie = (f'\n    <div style="color:#9a9a9a;font-size:11px;margin-top:12px;line-height:1.5;">'
+                    f'* La variación se calcula solo sobre locales con histórico 2025. '
+                    f'{lista} abrieron en 2026, no tienen comparable (su venta sí suma al total).</div>')
+    else:
+        nota_pie = ""
 
     by_name = {r["branch"]: r for r in rows}
     cuerpo = ""
@@ -295,14 +335,14 @@ def render_html(fecha, rows, totals, propias, franquicias):
 
   <!-- KPIs (alturas igualadas con height fijo en el contenido) -->
   <tr><td style="padding:30px 32px 6px 32px;">
-    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;">CONSOLIDADO · 6 SUCURSALES</div>
+    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;">CONSOLIDADO · 9 SUCURSALES</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
       <tr>
         <td width="33%" style="padding-right:7px;vertical-align:top;">
           <div style="background:#111111;border-radius:12px;padding:20px;height:118px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DEL DÍA</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['dia'])}</div>
-            <div style="color:#777777;font-size:11px;margin-top:6px;">6 sucursales</div>
+            <div style="color:#777777;font-size:11px;margin-top:6px;">9 sucursales</div>
           </div>
         </td>
         <td width="34%" style="padding:0 7px;vertical-align:top;">
@@ -356,15 +396,15 @@ def render_html(fecha, rows, totals, propias, franquicias):
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['dia'])}</td>
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a26'])}</td>
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a25'])}</td>
-          <td style="padding:17px 18px;text-align:right;">{chip(totals['pct'], totals['diff'])}</td>
+          <td style="padding:17px 18px;text-align:right;">{chip(totals['pct'], totals['diff'], nota=totals.get('hay_nuevo'))}</td>
         </tr>
       </tbody>
-    </table>
+    </table>{nota_pie}
   </td></tr>
 
   <!-- FOOTER -->
   <tr><td style="background:#000000;padding:20px 32px;text-align:center;">
-    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S USA · Reporte automático generado el {fecha.strftime('%d/%m/%Y')}</div>
+    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S EUROPA · Reporte automático generado el {fecha.strftime('%d/%m/%Y')}</div>
   </td></tr>
 
 </table>
@@ -388,7 +428,7 @@ if __name__ == "__main__":
     save_accumulator(state, new_state)
 
     # Asunto: "Reporte Ventas DD/MM/YYYY - Lucciano's USA"
-    subject = f"Reporte Ventas {fecha.strftime('%d/%m/%Y')} - Lucciano's USA"
+    subject = f"Reporte Ventas {fecha.strftime('%d/%m/%Y')} - Lucciano's Europa"
 
     # Exponer salidas al workflow de GitHub Actions
     gh_out = os.environ.get("GITHUB_OUTPUT")
