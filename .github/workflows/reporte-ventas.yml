@@ -7,7 +7,7 @@ name: Reporte de Ventas Diario
 # mande dos veces. Si cron-job.org se cae, no llega el reporte y se corre a mano.
 on:
   repository_dispatch:
-    types: [reporte-diario]
+    types: [reporte-diario-europa]
   workflow_dispatch: {}
 
 permissions:
@@ -32,13 +32,13 @@ jobs:
           python-version: "3.12"
 
       - name: Instalar dependencias
-        run: pip install openpyxl matplotlib
+        run: pip install openpyxl matplotlib pdfplumber
 
-      - name: Bajar reporte de TouchBistro (mail -> Ventas_ayer.xlsx)
+      - name: Bajar cierres de caja (mails -> Ventas_ayer.xlsx)
         env:
           IMAP_USER: ${{ secrets.IMAP_USER }}
           IMAP_APP_PASS: ${{ secrets.IMAP_APP_PASS }}
-        run: python fetch_touchbistro.py
+        run: python fetch_cierres.py
 
       # Registra el dia en data/historico_<anio>.json. Va ANTES de report.py a
       # proposito: es idempotente (la fecha es la clave) y asi el dia queda
