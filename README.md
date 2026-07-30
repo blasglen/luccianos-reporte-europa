@@ -1,144 +1,99 @@
-# Lucciano's USA — Reportes de Ventas
+# Lucciano's Europa — Reportes de Ventas
 
-Tres reportes automáticos por mail sobre las 6 sucursales de Lucciano's USA, comparando siempre contra el mismo período del año anterior.
+Reporte diario automático por mail sobre los 9 locales de Lucciano's Europa,
+comparando el mes en curso (2026) contra el mismo período del año anterior (2025).
 
 | Reporte | Cuándo | Período | Destinatario |
 |---|---|---|---|
-| **Diario** | Todos los días 7:00 | El día de ayer + acumulado del mes | `MAIL_TO` |
-| **Semanal** | Lunes 7:30 | Lunes a domingo + acumulado del mes | `MAIL_TO_SOCIOS` |
-| **Cierre** | Día 1 de cada mes, 8:00 | El mes completo | `MAIL_TO_SOCIOS` |
+| **Diario** | Todos los días 7:00 AR | El día de ayer + acumulado del mes | `MAIL_TO` |
+
+> El semanal y el cierre están pendientes de adaptar (reusan `fetch_cierres.py`
+> pero necesitan su propio backfill de histórico mensual). No dispares esos crons todavía.
 
 ---
 
 ## Cómo se dispara
 
-**Un solo disparador automático por reporte**: cron-job.org le pega por API a
-`POST https://api.github.com/repos/blasglen/luccianos-reporte/dispatches` con un `event_type` distinto.
+cron-job.org le pega por API a
+`POST https://api.github.com/repos/blasglen/luccianos-reporte-europa/dispatches`
+con `event_type: reporte-diario-europa`. Si se cae, se corre a mano desde Actions
+(`workflow_dispatch` habilitado).
 
-| Job en cron-job.org | Horario (AR) | `event_type` |
-|---|---|---|
-| Lucciano's - Reporte Diario | Todos los días 7:00 | `reporte-diario` |
-| Lucciano's - Reporte Semanal | Lunes 7:30 | `reporte-semanal` |
-| Lucciano's - Cierre Mensual | Día 1, 8:00 | `reporte-cierre` |
-
-**No hay `schedule` en los workflows a propósito.** Dos disparadores = riesgo de mandar el mismo mail dos veces a los socios. Con uno solo eso es imposible. Si cron-job.org se cae, el reporte no sale y se corre a mano desde Actions (`workflow_dispatch` está habilitado en los tres).
-
-El orden importa: el semanal y el cierre **leen lo que el diario dejó**, así que corren después. Si el diario falló, los dos cortan en rojo antes de mandar nada.
+Corre 7:00 AR: Europa va varias horas adelantada, así que a esa hora ya entraron
+los ~17 cierres de anoche.
 
 ---
 
-## Flujo de datos
+## Flujo de datos (la gran diferencia con USA)
+
+En USA llegaba UN Excel de TouchBistro. Acá llegan **~17 PDF** ("Cierre de Caja"),
+uno por punto de venta, en mails separados de `informatica@luccianos.com.ar`.
 
 ```
-                  Mail de TouchBistro (diario)
+        ~17 mails de informatica@luccianos.com.ar (PDF por punto de venta)
                             |
-                 fetch_touchbistro.py  (IMAP)
+                   fetch_cierres.py  (IMAP + pdfplumber)
+                   - junta todos los PDF del día
+                   - agrupa por campo "Sucursal:" -> 9 locales
+                   - dedup por (punto de venta, día de INICIO DE CAJA)
+                   - BRUTO -> NETO (÷ 1.10, IVA 10%)
                             |
-                     Ventas_ayer.xlsx
+                     Ventas_ayer.xlsx   (mismo formato que esperaba report.py)
                             |
             +---------------+---------------+
-            |                               |
       historico.py                      report.py
             |                               |
  data/historico_2026.json          data/acumulado.json
- (venta + tickets por día)        (acumulado del mes; se
-            |                      reinicia solo el día 2)
-            |                               |
-            +---------------+---------------+
-                            |
-        +-------------------+-------------------+
-        |                   |                   |
-  report.py          report_semanal.py    report_cierre.py
-   (diario)              (lunes)             (día 1)
+                                           |
+                                     report.py (diario)
 ```
 
-**Un solo punto de entrada de datos** (`fetch_touchbistro.py`), tres formas de leerlos. Si TouchBistro cambia el formato del Excel, se toca `fetch_touchbistro.py` y `VENUE_MAP`, y los tres reportes se acomodan solos.
+**El día de negocio NO se saca del asunto ni del nombre del PDF** (mienten: los
+locales que cierran pasada la medianoche quedan estampados con la fecha del día
+siguiente). Se saca de la línea `INICIO DE CAJA` / `APERTURA DI CASSA`. Roma viene
+en italiano y el parser es bilingüe.
 
-El comparativo del año anterior sale siempre de `data/Ventas_Master_2025.xlsx` (junio a diciembre 2025, una fila por día y local), vía `generar_acum_ant.py`.
+El comparativo 2025 sale de `data/Ventas_Master_2025.xlsx` (7 locales; también en
+bruto, se pasa a neto ÷1.10) vía `generar_acum2025.py`.
+
+---
+
+## Locales
+
+**Propias (4):** Barcelona 1, Barcelona 2, Madrid, Roma
+**Franquicias (5):** Málaga 1, Málaga 3, Valencia, Alicante, Granada
+
+Cada local puede tener varios puntos de venta (ej. Barcelona 2 = PDV 801/802/803/804);
+`fetch_cierres.py` los suma por el campo `Sucursal:`. Si aparece un local que no está
+en la lista blanca, **revienta** en vez de ignorarlo.
+
+**Madrid y Alicante abrieron en 2026**: no tienen histórico 2025. Se muestran con
+"—" y chip gris `s/ comp.`, y quedan FUERA del cálculo de la variación % (pero su
+venta SÍ suma al total). Una nota al pie automática lo aclara.
 
 ---
 
 ## Archivos
 
-### Motores
 | Archivo | Qué hace |
 |---|---|
-| `fetch_touchbistro.py` | Baja el adjunto diario del mail (IMAP). Distingue el diario del mensual: fecha inicio == fecha fin |
-| `report.py` | Reporte diario. `parse_excel_full()` es **el** parser: consolida los 7 venues en 6 sucursales vía `VENUE_MAP` (las dos Vineland se suman) y saca Net Sales + Bill Count |
-| `historico.py` | Registra el día en `data/historico_<año>.json`. Idempotente: la fecha es la clave |
-| `generar_acum2025.py` | Comparativo del diario (1° del mes al día X) |
-| `generar_acum_ant.py` | Comparativo **genérico por rango**. Lo usan el semanal y el cierre |
-| `report_semanal.py` | Reporte semanal (lunes a domingo) |
-| `report_cierre.py` | Cierre mensual + snapshot en `data/cierres.json`. Registra el mes en `mensual.py` y agrega el bloque **Acumulado del año (YTD)** interanual |
-| `mensual.py` | Master mensual (24+ meses) y métricas de largo plazo: **acum. últimos 12 meses** (columna del semanal) y **acumulado del año / YTD** (bloque del cierre). Falla en rojo si a una ventana le falta un mes |
-| `charts.py` | Los gráficos (matplotlib, PNG transparentes, embebidos por CID) |
-| `send_mail.py` | Gmail SMTP. Primer destinatario en Para, el resto en CC |
-| `fetch_historico.py` | **One-shot**: rescata del IMAP los días viejos que sigan en la casilla |
-
-### Estado (lo escribe el bot, no tocar a mano)
-| Archivo | Qué es |
-|---|---|
-| `data/acumulado.json` | Acumulado del mes por sucursal + `last_date`. Se reinicia solo al cambiar de mes |
-| `data/historico_<año>.json` | Un día por clave: `{"venta": 1234.56, "tickets": 87}` por sucursal |
-| `data/semanal.json` | Candado: la última semana enviada. Evita reenvíos |
-| `data/cierres.json` | Snapshot de cada mes cerrado. **Es el candado y el archivo histórico a la vez** |
-| `data/mensual_master.json` | Un registro por mes y sucursal (venta + tickets). Lo backfilleás una vez y de ahí lo alimenta el cierre (`registrar_mes`). Fuente del acum. 12 meses (semanal) y del YTD (cierre) |
+| `fetch_cierres.py` | Baja los PDF por IMAP, los parsea (bilingüe), consolida por local, pasa a neto y deja `Ventas_ayer.xlsx` |
+| `report.py` | Reporte diario. Formato €, lógica de "sin comparable", 9 locales |
+| `historico.py` | Registra el día en `data/historico_<año>.json` |
+| `generar_acum2025.py` | Comparativo del año anterior desde el Master europeo (neto) |
+| `charts.py` | Gráficos (€) |
+| `send_mail.py` | Envía por SMTP. Remitente "Lucciano's Europa" |
 
 ### Secrets
-`IMAP_USER` / `IMAP_APP_PASS` (casilla que **recibe** de TouchBistro) · `GMAIL_USER` / `GMAIL_APP_PASS` (casilla que **envía**) · `MAIL_TO` (diario) · `MAIL_TO_SOCIOS` (semanal y cierre).
-
----
-
-## Controles
-
-El sistema prefiere **fallar en rojo antes que mandar un número mal**.
-
-- **Anti doble-conteo (diario)**: si `last_date` es la fecha del Excel, no suma ni manda.
-- **Candados (semanal y cierre)**: no se reenvía una semana o un mes ya enviado.
-- **Validación de dependencia**: el semanal exige `last_date == domingo`; el cierre, `last_date == último día del mes`. Si el diario quedó atrasado, no se manda.
-- **Días faltantes**: si al historial o al master 2025 les falta un día del rango, corta y **dice cuáles**.
-- **Conciliación automática**: cuando el historial cubre el mes completo, el semanal compara `suma(historial)` contra `acumulado.json`. Son **dos caminos independientes al mismo número**; si no cierran al centavo, no se manda nada. Se prende sola, no hay nada que activar.
-- **Venue desconocido**: si aparece una sucursal que no está en `VENUE_MAP`, revienta en vez de ignorarla.
-- **Ventana del cierre**: el mes cerrado vive 24 horas en `acumulado.json` (el día 1, entre las 7:00 y las 7:00 del día 2, cuando el diario reinicia). Por eso el cierre corre el día 1 y guarda el snapshot.
+`IMAP_USER` / `IMAP_APP_PASS` (casilla que **recibe**: reportesluccianos@gmail.com) ·
+`GMAIL_USER` / `GMAIL_APP_PASS` (casilla que **envía**: contabilidad@luccianos.com.ar) ·
+`MAIL_TO` (destinatario).
 
 ---
 
 ## Criterios de negocio
 
-- **Comparación interanual: mismas fechas calendario.** El espejo de 2026-07-13 es 2025-07-13, sin alinear por día de semana.
-- **El total semanal es una comparación limpia** aunque las fechas no estén alineadas: cualquier ventana de 7 días tiene exactamente un lunes, un martes... y un domingo. La composición siempre coincide.
-- **El gráfico día por día NO compara contra 2025.** Con espejo calendario, el "Lun 13" de 2026 caería al lado de un domingo de 2025. Muestra solo el año en curso con su promedio.
-- **El mes SÍ tiene distorsión de calendario** (julio 2026 tiene 5 viernes; julio 2025 tenía 4). El cierre lo **blanquea con una nota automática** que aparece sola cuando las composiciones difieren.
-- **Ticket promedio = venta total ÷ tickets totales.** Nunca el promedio de los promedios: eso le daría el mismo peso a Aventura que a Sawgrass.
-- **Ventas netas** (Net Sales), sin impuestos. Las dos unidades de Vineland se informan consolidadas.
-
----
-
-## Acumulados de largo plazo (12 meses y año)
-
-Dos métricas nuevas viven en `mensual.py`, sobre `data/mensual_master.json` (un registro por mes y sucursal):
-
-- **Semanal → columna "Acum. Últ. 12M"**: acumulado de los últimos 12 meses cerrados por sucursal (ventana móvil que termina en el último mes cerrado). Solo el monto, en escala anual, sin variación. No se compara con la semana ni con el mes.
-- **Cierre → bloque "Acumulado del año (YTD)"**: acumulado del año calendario hasta el mes cerrado (ej. enero a junio) contra el mismo período del año anterior. En el cierre de julio pasa a enero–julio, y así.
-
-**Deploy inicial (una sola vez).** Antes del primer cierre con el master mensual, generá el archivo:
-
-```
-# Poné los exports mensuales de TouchBistro en ./backfill_exports/ y corré:
-python mensual.py backfill
-git add data/mensual_master.json && git commit -m "Backfill master mensual"
-```
-
-De ahí en más el cierre lo mantiene solo: cada día 1 registra el mes que cerró (`registrar_mes`), y el archivo se commitea en el workflow del cierre.
-
-**Control de dos caminos.** Cuando el historial diario cubre un mes completo, su suma tiene que dar igual al registro mensual, al centavo (`conciliar_con_historial`); si no cierran, el cierre corta en rojo. Mismo espíritu que la conciliación del semanal.
-
-## Mantenimiento
-
-**Sucursal nueva** → agregarla a `VENUE_MAP` (`report.py`), a `BRANCH_ORDER`, a `PROPIAS`/`FRANQUICIAS`, y a `CODE_TO_TBKEY` (`generar_acum_ant.py`). Hasta que se toque, los reportes revientan a propósito.
-
-**Enero 2027** ⚠️ → el comparativo va a buscar el año anterior (2026) en `Ventas_Master_2025.xlsx` y no lo va a encontrar. Hay que armar `Ventas_Master_2026.xlsx` con el mismo export de TouchBistro. `historico_2026.json` cubre de julio en adelante y sirve para controlar ese export; enero a junio 2026 hay que sacarlo de TouchBistro.
-
-**Deuda técnica conocida** → `generar_acum2025.py` duplica lógica con `generar_acum_ant.py`. Se puede convertir en un wrapper de 3 líneas que llame a `acumular_rango()`.
-
-**Semanas que cruzan de mes** → el semanal muestra el acumulado del mes del domingo de cierre. Si la semana arranca el 31/07 y termina el 06/08, el acumulado es el de agosto. Es correcto ("acumulado del mes hasta ese día"), pero ese lunes el acumulado se ve chico contra la semana.
+- **Venta = neto** (bruto de los cierres ÷ 1.10, IVA 10%).
+- **Comparación interanual: mismas fechas calendario.**
+- **Ticket = cantidad de FACTURAS B** por local.
+- Locales sin histórico 2025 → "—" y fuera del %.

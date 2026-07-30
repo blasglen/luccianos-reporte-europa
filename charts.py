@@ -24,14 +24,14 @@ DPI = 200  # alta resolucion para que no se vea pixelado
 
 def _money_k(x, _):
     if x >= 1000:
-        return f"${x/1000:.0f}k"
-    return f"${x:.0f}"
+        return f"{x/1000:.0f}k €"
+    return f"{x:.0f} €"
 
 
 def chart_comparativo(rows, a26_lbl, a25_lbl, out_path):
     branches = [r["branch"] for r in rows]
     v26 = [r["a26"] for r in rows]
-    v25 = [r["a25"] for r in rows]
+    v25 = [(r["a25"] or 0) for r in rows]  # locales nuevos (a25=None) -> barra 2025 en cero
 
     n = len(branches)
     x = range(n)
@@ -71,9 +71,9 @@ def chart_progreso(a26, a25, pct, out_path):
     ax.set_ylim(-0.6, 0.6)
     ax.axis("off")
 
-    ax.text(a26, 0, f"  ${a26:,.0f}", va="center", ha="left", fontsize=12,
+    ax.text(a26, 0, f"  {a26:,.0f} €", va="center", ha="left", fontsize=12,
             fontweight="bold", color="#111111", zorder=5)
-    ax.text(a25, 0.42, f"Año ant. ${a25:,.0f}", va="bottom", ha="center",
+    ax.text(a25, 0.42, f"Año ant. {a25:,.0f} €", va="bottom", ha="center",
             fontsize=8, color=GRIS_TXT)
 
     fig.tight_layout(pad=0.3)
@@ -176,9 +176,9 @@ def chart_ytd(labels, v_ant, v_act, ytd_ant, ytd_act, lbl_ant, lbl_act, out_path
         ax.spines[sp].set_visible(False)
     ax.spines["bottom"].set_color("#dddddd")
     ax.grid(axis="y", color="#f0f0f0", zorder=0)
-    ax.annotate(f"Acum. {lbl_ant}: ${ytd_ant/1e6:.2f}M", xy=(0, top * 1.26), ha="left", va="top",
+    ax.annotate(f"Acum. {lbl_ant}: {ytd_ant/1e6:.2f}M €", xy=(0, top * 1.26), ha="left", va="top",
                 fontsize=9.5, color="#3f5c86", fontweight="bold")
-    ax.annotate(f"Acum. {lbl_act}: ${ytd_act/1e6:.2f}M", xy=(len(labels) - 1, top * 1.26), ha="right", va="top",
+    ax.annotate(f"Acum. {lbl_act}: {ytd_act/1e6:.2f}M €", xy=(len(labels) - 1, top * 1.26), ha="right", va="top",
                 fontsize=9.5, color=AZUL, fontweight="bold")
     ax.legend(handles=[Patch(color=CELESTE, label=lbl_ant), Patch(color=AZUL, label=lbl_act)],
               loc="lower center", bbox_to_anchor=(0.5, -0.26), ncol=2, frameon=False, fontsize=9)
