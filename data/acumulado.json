@@ -1,1 +1,15 @@
-{"month": null, "last_date": null, "acumulado": {}}
+{
+  "month": "2026-07",
+  "last_date": "2026-07-30",
+  "acumulado": {
+    "Barcelona 1": 6768.73,
+    "Barcelona 2": 2710.91,
+    "Madrid": 2061.82,
+    "Roma": 3008.27,
+    "Málaga 1": 4051.5,
+    "Málaga 3": 1815.95,
+    "Valencia": 4133.05,
+    "Alicante": 3023.45,
+    "Granada": 449.27
+  }
+}
