@@ -25,7 +25,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, parse_excel_full, SIN_HISTORICO_2025
+from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, money2, parse_excel_full, SIN_HISTORICO_2025
 from generar_acum_ant import acumular_rango, escribir_excel, espejo
 import mensual
 
@@ -236,6 +236,7 @@ def construir(dia1, ultimo):
              "hay_nuevo": any(not r["comparable"] for r in items)}
         c26 = round(sum(r["a26"] for r in comp), 2)
         c25 = round(sum(r["a25"] for r in comp), 2)
+        t["ca26"], t["ca25"] = c26, c25
         t["diff"] = c26 - c25
         t["pct"] = (t["diff"] / c25 * 100) if c25 else 0.0
         return t
@@ -319,10 +320,10 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
           <div style="background:#f5f5f5;border-radius:12px;padding:18px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">TICKET PROMEDIO</div>
             <table role="presentation" width="100%"><tr>
-              <td style="color:#111111;font-size:20px;font-weight:800;padding-top:6px;">{money(totals['tp26'])}</td>
+              <td style="color:#111111;font-size:20px;font-weight:800;padding-top:6px;">{money2(totals['tp26'])}</td>
               <td style="text-align:right;">{chip(totals['tp_pct'], 0)}</td>
             </tr></table>
-            <div style="color:#9a9a9a;font-size:11px;margin-top:2px;">{money(totals['tp25'])} en {anio - 1}</div>
+            <div style="color:#9a9a9a;font-size:11px;margin-top:2px;">{money2(totals['tp25'])} en {anio - 1}</div>
           </div>
         </td>
       </tr>
@@ -332,7 +333,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
         return f"""
         <tr style="background:{zebra};">
           <td style="padding:14px 18px;font-weight:700;color:#111111;font-size:14px;">{r['branch']}
-            <div style="color:#9a9a9a;font-size:11px;font-weight:400;margin-top:2px;">{r['share']:.1f}% del total{'' if not con_tks else f" · ticket prom. {money(r['tp26'])}"}</div>
+            <div style="color:#9a9a9a;font-size:11px;font-weight:400;margin-top:2px;">{r['share']:.1f}% del total{'' if not con_tks else f" · ticket prom. {money2(r['tp26'])}"}</div>
           </td>
           <td style="padding:14px 12px;text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
           <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25']) if r['a25'] is not None else "—"}</td>
@@ -448,23 +449,24 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
       <tr>
         <td width="33%" style="padding-right:7px;vertical-align:top;">
-          <div style="background:#111111;border-radius:12px;padding:20px;height:126px;">
+          <div style="background:#111111;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DE {a26_lbl}</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a26'])}</div>
             <div style="color:#777777;font-size:11px;margin-top:6px;">promedio {money(prom)}/día</div>
           </div>
         </td>
         <td width="34%" style="padding:0 7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:126px;">
+          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DE {a25_lbl}</div>
             <div style="color:#111111;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a25'])}</div>
             <div style="color:#9a9a9a;font-size:10px;margin-top:6px;">{ia.strftime('%d/%m')} al {fa.strftime('%d/%m/%Y')}</div>
           </div>
         </td>
         <td width="33%" style="padding-left:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:126px;">
+          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VARIACIÓN INTERANUAL</div>
-            <div style="margin-top:16px;">{chip(totals['pct'], totals['diff'], grande=True)}</div>
+            <div style="margin-top:14px;">{chip(totals['pct'], totals['diff'], grande=True, nota=totals.get('hay_nuevo'))}</div>
+            {f'<div style="color:#9a9a9a;font-size:11px;margin-top:10px;line-height:1.5;">{money(totals["ca26"])} vs {money(totals["ca25"])}<br>{sum(1 for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025)} locales comparables</div>' if totals.get('hay_nuevo') else ''}
           </div>
         </td>
       </tr>

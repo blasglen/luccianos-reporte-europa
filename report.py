@@ -114,6 +114,12 @@ def money(v):
     s = f"{round(v):,}".replace(",", ".")
     return f"{s}\u00a0€"
 
+def money2(v):
+    # Como money() pero CON 2 decimales. Se usa para el TICKET PROMEDIO, donde
+    # los centavos importan (8,80 EUR no es lo mismo que 9 EUR).
+    s = f"{v:,.2f}".replace(",", "·").replace(".", ",").replace("·", ".")
+    return f"{s}\u00a0€"
+
 
 def build_report(ventas_path, acum25_path, acum_state_path):
     fecha_ini_v, fecha, venta_dia = parse_excel(ventas_path)
@@ -203,6 +209,7 @@ def build_report(ventas_path, acum25_path, acum_state_path):
         }
         comp_a26 = sum(r["a26"] for r in comp)
         comp_a25 = sum(r["a25"] for r in comp)
+        s["ca26"], s["ca25"] = round(comp_a26, 2), round(comp_a25, 2)
         s["diff"] = comp_a26 - comp_a25
         s["pct"] = (s["diff"] / comp_a25 * 100) if comp_a25 else 0.0
         return s
@@ -340,24 +347,25 @@ def render_html(fecha, rows, totals, propias, franquicias):
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
       <tr>
         <td width="33%" style="padding-right:7px;vertical-align:top;">
-          <div style="background:#111111;border-radius:12px;padding:20px;height:118px;">
+          <div style="background:#111111;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DEL DÍA</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['dia'])}</div>
             <div style="color:#777777;font-size:11px;margin-top:6px;">9 sucursales</div>
           </div>
         </td>
         <td width="34%" style="padding:0 7px;vertical-align:top;">
-          <div style="background:#111111;border-radius:12px;padding:20px;height:118px;">
+          <div style="background:#111111;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">{a26_lbl}</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a26'])}</div>
             <div style="color:#777777;font-size:11px;margin-top:6px;">mes en curso</div>
           </div>
         </td>
         <td width="33%" style="padding-left:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:118px;">
+          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">{a25_lbl}</div>
             <div style="color:#111111;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a25'])}</div>
-            <div style="margin-top:8px;">{chip(totals['pct'], totals['diff'])}</div>
+            <div style="margin-top:8px;">{chip(totals['pct'], totals['diff'], nota=totals.get('hay_nuevo'))}</div>
+            {f'<div style="color:#9a9a9a;font-size:10px;margin-top:8px;line-height:1.4;">{money(totals["ca26"])} vs {money(totals["ca25"])} · {sum(1 for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025)} comparables</div>' if totals.get('hay_nuevo') else ''}
           </div>
         </td>
       </tr>
