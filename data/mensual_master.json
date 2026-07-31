@@ -1,1 +1,686 @@
-{}
+{
+  "2025-01": {
+    "Barcelona 1": {
+      "venta": 109837.4,
+      "tickets": 13289
+    },
+    "Barcelona 2": {
+      "venta": 37009.28,
+      "tickets": 5126
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 87973.86,
+      "tickets": 9517
+    },
+    "Málaga 1": {
+      "venta": 55946.41,
+      "tickets": 7115
+    },
+    "Málaga 3": {
+      "venta": 8088.56,
+      "tickets": 1197
+    },
+    "Valencia": {
+      "venta": 78371.83,
+      "tickets": 9967
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-02": {
+    "Barcelona 1": {
+      "venta": 109114.21,
+      "tickets": 12883
+    },
+    "Barcelona 2": {
+      "venta": 43475.33,
+      "tickets": 5959
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 93846.21,
+      "tickets": 10344
+    },
+    "Málaga 1": {
+      "venta": 65939.4,
+      "tickets": 8230
+    },
+    "Málaga 3": {
+      "venta": 23857.5,
+      "tickets": 3256
+    },
+    "Valencia": {
+      "venta": 80213.3,
+      "tickets": 10405
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-03": {
+    "Barcelona 1": {
+      "venta": 121081.82,
+      "tickets": 14574
+    },
+    "Barcelona 2": {
+      "venta": 50754.57,
+      "tickets": 7190
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 109997.6,
+      "tickets": 12245
+    },
+    "Málaga 1": {
+      "venta": 71627.2,
+      "tickets": 9406
+    },
+    "Málaga 3": {
+      "venta": 23629.14,
+      "tickets": 3169
+    },
+    "Valencia": {
+      "venta": 98120.29,
+      "tickets": 13113
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-04": {
+    "Barcelona 1": {
+      "venta": 162639.09,
+      "tickets": 18056
+    },
+    "Barcelona 2": {
+      "venta": 78926.91,
+      "tickets": 10421
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 148509.37,
+      "tickets": 15586
+    },
+    "Málaga 1": {
+      "venta": 110728.83,
+      "tickets": 13328
+    },
+    "Málaga 3": {
+      "venta": 40782.51,
+      "tickets": 5275
+    },
+    "Valencia": {
+      "venta": 119348.9,
+      "tickets": 14359
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-05": {
+    "Barcelona 1": {
+      "venta": 185352.39,
+      "tickets": 21333
+    },
+    "Barcelona 2": {
+      "venta": 84869.74,
+      "tickets": 11554
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 146572.38,
+      "tickets": 16225
+    },
+    "Málaga 1": {
+      "venta": 108736.02,
+      "tickets": 13598
+    },
+    "Málaga 3": {
+      "venta": 44259.84,
+      "tickets": 5733
+    },
+    "Valencia": {
+      "venta": 132447.74,
+      "tickets": 16559
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-06": {
+    "Barcelona 1": {
+      "venta": 190559.2,
+      "tickets": 21371
+    },
+    "Barcelona 2": {
+      "venta": 92054.61,
+      "tickets": 12321
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 141964.28,
+      "tickets": 15564
+    },
+    "Málaga 1": {
+      "venta": 102711.27,
+      "tickets": 13013
+    },
+    "Málaga 3": {
+      "venta": 40120.63,
+      "tickets": 5237
+    },
+    "Valencia": {
+      "venta": 137420.36,
+      "tickets": 17220
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 0.0,
+      "tickets": 0
+    }
+  },
+  "2025-07": {
+    "Barcelona 1": {
+      "venta": 207531.3,
+      "tickets": 22533
+    },
+    "Barcelona 2": {
+      "venta": 93178.4,
+      "tickets": 11746
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 141710.59,
+      "tickets": 14929
+    },
+    "Málaga 1": {
+      "venta": 120125.59,
+      "tickets": 15017
+    },
+    "Málaga 3": {
+      "venta": 50437.08,
+      "tickets": 6372
+    },
+    "Valencia": {
+      "venta": 139532.92,
+      "tickets": 16497
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 32376.31,
+      "tickets": 4077
+    }
+  },
+  "2025-08": {
+    "Barcelona 1": {
+      "venta": 220153.21,
+      "tickets": 23761
+    },
+    "Barcelona 2": {
+      "venta": 91388.1,
+      "tickets": 11106
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 143057.21,
+      "tickets": 14908
+    },
+    "Málaga 1": {
+      "venta": 136323.38,
+      "tickets": 16537
+    },
+    "Málaga 3": {
+      "venta": 52740.65,
+      "tickets": 6509
+    },
+    "Valencia": {
+      "venta": 149492.63,
+      "tickets": 17047
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 48694.01,
+      "tickets": 5923
+    }
+  },
+  "2025-09": {
+    "Barcelona 1": {
+      "venta": 164023.79,
+      "tickets": 20427
+    },
+    "Barcelona 2": {
+      "venta": 69487.97,
+      "tickets": 9429
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 125883.93,
+      "tickets": 14124
+    },
+    "Málaga 1": {
+      "venta": 93232.16,
+      "tickets": 12204
+    },
+    "Málaga 3": {
+      "venta": 30708.67,
+      "tickets": 4117
+    },
+    "Valencia": {
+      "venta": 114595.8,
+      "tickets": 14488
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 35778.94,
+      "tickets": 4829
+    }
+  },
+  "2025-10": {
+    "Barcelona 1": {
+      "venta": 156216.26,
+      "tickets": 19288
+    },
+    "Barcelona 2": {
+      "venta": 68314.81,
+      "tickets": 9447
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 136016.92,
+      "tickets": 14612
+    },
+    "Málaga 1": {
+      "venta": 81721.72,
+      "tickets": 10752
+    },
+    "Málaga 3": {
+      "venta": 25461.45,
+      "tickets": 3431
+    },
+    "Valencia": {
+      "venta": 111201.83,
+      "tickets": 13979
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 30516.19,
+      "tickets": 4243
+    }
+  },
+  "2025-11": {
+    "Barcelona 1": {
+      "venta": 111838.93,
+      "tickets": 14387
+    },
+    "Barcelona 2": {
+      "venta": 45791.19,
+      "tickets": 6643
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 92630.41,
+      "tickets": 10298
+    },
+    "Málaga 1": {
+      "venta": 51358.33,
+      "tickets": 6924
+    },
+    "Málaga 3": {
+      "venta": 15140.35,
+      "tickets": 2155
+    },
+    "Valencia": {
+      "venta": 85510.36,
+      "tickets": 10867
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 15072.17,
+      "tickets": 2186
+    }
+  },
+  "2025-12": {
+    "Barcelona 1": {
+      "venta": 96600.93,
+      "tickets": 11968
+    },
+    "Barcelona 2": {
+      "venta": 33481.56,
+      "tickets": 4652
+    },
+    "Madrid": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Roma": {
+      "venta": 81150.55,
+      "tickets": 8845
+    },
+    "Málaga 1": {
+      "venta": 56008.37,
+      "tickets": 7010
+    },
+    "Málaga 3": {
+      "venta": 13414.76,
+      "tickets": 1862
+    },
+    "Valencia": {
+      "venta": 90209.72,
+      "tickets": 10910
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 12106.76,
+      "tickets": 1627
+    }
+  },
+  "2026-01": {
+    "Barcelona 1": {
+      "venta": 92255.66,
+      "tickets": 11805
+    },
+    "Barcelona 2": {
+      "venta": 31440.56,
+      "tickets": 4384
+    },
+    "Madrid": {
+      "venta": 28447.74,
+      "tickets": 3432
+    },
+    "Roma": {
+      "venta": 74600.09,
+      "tickets": 8182
+    },
+    "Málaga 1": {
+      "venta": 48108.38,
+      "tickets": 6355
+    },
+    "Málaga 3": {
+      "venta": 13185.79,
+      "tickets": 1891
+    },
+    "Valencia": {
+      "venta": 72589.76,
+      "tickets": 9449
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 11458.13,
+      "tickets": 1532
+    }
+  },
+  "2026-02": {
+    "Barcelona 1": {
+      "venta": 108592.74,
+      "tickets": 13511
+    },
+    "Barcelona 2": {
+      "venta": 45792.5,
+      "tickets": 6368
+    },
+    "Madrid": {
+      "venta": 48975.64,
+      "tickets": 5851
+    },
+    "Roma": {
+      "venta": 84374.8,
+      "tickets": 9305
+    },
+    "Málaga 1": {
+      "venta": 57040.26,
+      "tickets": 7282
+    },
+    "Málaga 3": {
+      "venta": 15689.0,
+      "tickets": 2152
+    },
+    "Valencia": {
+      "venta": 81370.7,
+      "tickets": 10432
+    },
+    "Alicante": {
+      "venta": 0.0,
+      "tickets": 0
+    },
+    "Granada": {
+      "venta": 14634.27,
+      "tickets": 2027
+    }
+  },
+  "2026-03": {
+    "Barcelona 1": {
+      "venta": 124325.3,
+      "tickets": 15359
+    },
+    "Barcelona 2": {
+      "venta": 52316.0,
+      "tickets": 7442
+    },
+    "Madrid": {
+      "venta": 61360.94,
+      "tickets": 7444
+    },
+    "Roma": {
+      "venta": 108742.45,
+      "tickets": 11709
+    },
+    "Málaga 1": {
+      "venta": 74381.21,
+      "tickets": 9817
+    },
+    "Málaga 3": {
+      "venta": 20439.09,
+      "tickets": 2831
+    },
+    "Valencia": {
+      "venta": 113514.43,
+      "tickets": 15034
+    },
+    "Alicante": {
+      "venta": 4893.55,
+      "tickets": 552
+    },
+    "Granada": {
+      "venta": 20145.38,
+      "tickets": 2738
+    }
+  },
+  "2026-04": {
+    "Barcelona 1": {
+      "venta": 174566.17,
+      "tickets": 20021
+    },
+    "Barcelona 2": {
+      "venta": 73933.62,
+      "tickets": 9136
+    },
+    "Madrid": {
+      "venta": 91083.2,
+      "tickets": 10345
+    },
+    "Roma": {
+      "venta": 143671.2,
+      "tickets": 14769
+    },
+    "Málaga 1": {
+      "venta": 103713.57,
+      "tickets": 12927
+    },
+    "Málaga 3": {
+      "venta": 31025.17,
+      "tickets": 4198
+    },
+    "Valencia": {
+      "venta": 130027.67,
+      "tickets": 15631
+    },
+    "Alicante": {
+      "venta": 116024.93,
+      "tickets": 12445
+    },
+    "Granada": {
+      "venta": 32671.25,
+      "tickets": 4115
+    }
+  },
+  "2026-05": {
+    "Barcelona 1": {
+      "venta": 188404.9,
+      "tickets": 20771
+    },
+    "Barcelona 2": {
+      "venta": 75905.68,
+      "tickets": 9509
+    },
+    "Madrid": {
+      "venta": 88928.47,
+      "tickets": 10490
+    },
+    "Roma": {
+      "venta": 152275.34,
+      "tickets": 16165
+    },
+    "Málaga 1": {
+      "venta": 104116.95,
+      "tickets": 13325
+    },
+    "Málaga 3": {
+      "venta": 34524.76,
+      "tickets": 4645
+    },
+    "Valencia": {
+      "venta": 142869.42,
+      "tickets": 17769
+    },
+    "Alicante": {
+      "venta": 120781.27,
+      "tickets": 13117
+    },
+    "Granada": {
+      "venta": 27788.17,
+      "tickets": 3655
+    }
+  },
+  "2026-06": {
+    "Barcelona 1": {
+      "venta": 189764.95,
+      "tickets": 22024
+    },
+    "Barcelona 2": {
+      "venta": 71716.33,
+      "tickets": 9116
+    },
+    "Madrid": {
+      "venta": 83236.21,
+      "tickets": 9996
+    },
+    "Roma": {
+      "venta": 123943.38,
+      "tickets": 13408
+    },
+    "Málaga 1": {
+      "venta": 95439.07,
+      "tickets": 12551
+    },
+    "Málaga 3": {
+      "venta": 35004.67,
+      "tickets": 4623
+    },
+    "Valencia": {
+      "venta": 139314.72,
+      "tickets": 17623
+    },
+    "Alicante": {
+      "venta": 126819.9,
+      "tickets": 13724
+    },
+    "Granada": {
+      "venta": 23104.28,
+      "tickets": 3091
+    }
+  }
+}
