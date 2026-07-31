@@ -26,7 +26,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from report import (
-    BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, parse_excel_full,
+    BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, parse_excel_full, SIN_HISTORICO_2025,
 )
 from generar_acum_ant import acumular_rango, escribir_excel, espejo
 import mensual
@@ -247,16 +247,18 @@ def construir(desde, hasta):
     for b in BRANCH_ORDER:
         s26, s25 = round(sem_act[b], 2), round(sem_ant[b], 2)
         a26, a25 = mes_act[b], round(mes_ant[b], 2)
-        diff = a26 - a25
         t26, t25 = sem_tks[b], sem_ant_tks[b]
         tp26 = (s26 / t26) if t26 else 0.0
         tp25 = (s25 / t25) if t25 else 0.0
+        comparable = b not in SIN_HISTORICO_2025
         rows.append({
-            "branch": b,
-            "sem26": s26, "sem25": s25,
-            "sem_diff": s26 - s25, "sem_pct": ((s26 - s25) / s25 * 100) if s25 else 0.0,
-            "a26": a26, "a25": a25,
-            "diff": diff, "pct": (diff / a25 * 100) if a25 else 0.0,
+            "branch": b, "comparable": comparable,
+            "sem26": s26, "sem25": s25 if comparable else None,
+            "sem_diff": (s26 - s25) if comparable else None,
+            "sem_pct": (((s26 - s25) / s25 * 100) if s25 else 0.0) if comparable else None,
+            "a26": a26, "a25": a25 if comparable else None,
+            "diff": (a26 - a25) if comparable else None,
+            "pct": (((a26 - a25) / a25 * 100) if a25 else 0.0) if comparable else None,
             "tks26": t26, "tks25": t25,
             "tks_pct": ((t26 - t25) / t25 * 100) if t25 else 0.0,
             "tp26": tp26, "tp25": tp25,
@@ -264,9 +266,16 @@ def construir(desde, hasta):
         })
 
     def agregar(items):
-        t = {}
-        for k in ("sem26", "sem25", "a26", "a25"):
-            t[k] = round(sum(r[k] for r in items), 2)
+        comp = [r for r in items if r["comparable"]]
+        t = {"hay_nuevo": any(not r["comparable"] for r in items)}
+        t["sem26"] = round(sum(r["sem26"] for r in items), 2)
+        t["a26"]   = round(sum(r["a26"] for r in items), 2)
+        t["sem25"] = round(sum((r["sem25"] or 0.0) for r in items), 2)
+        t["a25"]   = round(sum((r["a25"] or 0.0) for r in items), 2)
+        t["_csem26"] = round(sum(r["sem26"] for r in comp), 2)
+        t["_csem25"] = round(sum(r["sem25"] for r in comp), 2)
+        t["_ca26"]   = round(sum(r["a26"] for r in comp), 2)
+        t["_ca25"]   = round(sum(r["a25"] for r in comp), 2)
         for k in ("tks26", "tks25"):
             t[k] = sum(r[k] for r in items)
         # OJO: el ticket promedio del grupo NO es el promedio de los promedios.
@@ -276,10 +285,10 @@ def construir(desde, hasta):
         t["tp25"] = (t["sem25"] / t["tks25"]) if t["tks25"] else 0.0
         t["tks_pct"] = ((t["tks26"] - t["tks25"]) / t["tks25"] * 100) if t["tks25"] else 0.0
         t["tp_pct"] = ((t["tp26"] - t["tp25"]) / t["tp25"] * 100) if t["tp25"] else 0.0
-        t["sem_diff"] = t["sem26"] - t["sem25"]
-        t["sem_pct"] = (t["sem_diff"] / t["sem25"] * 100) if t["sem25"] else 0.0
-        t["diff"] = t["a26"] - t["a25"]
-        t["pct"] = (t["diff"] / t["a25"] * 100) if t["a25"] else 0.0
+        t["sem_diff"] = t["_csem26"] - t["_csem25"]
+        t["sem_pct"] = (t["sem_diff"] / t["_csem25"] * 100) if t["_csem25"] else 0.0
+        t["diff"] = t["_ca26"] - t["_ca25"]
+        t["pct"] = (t["diff"] / t["_ca25"] * 100) if t["_ca25"] else 0.0
         return t
 
     totals = agregar(rows)
@@ -323,9 +332,13 @@ def marcar_enviada(desde, hasta, totals):
 
 
 # --- 5. HTML --------------------------------------------------------------------
-def chip(pct, diff, grande=False):
+def chip(pct, diff, grande=False, nota=False):
     """diff=0 -> muestra solo el %. Se usa asi en tickets, donde poner "(+134)"
     al lado de un porcentaje de unidades confunde con plata."""
+    if pct is None:
+        return ('<span style="display:inline-block;background:#eeeeee;color:#8a8a8a;'
+                'font-weight:700;font-size:12px;padding:3px 9px;border-radius:20px;'
+                'white-space:nowrap;">s/ comp.</span>')
     up = pct >= 0
     col = "#1a7d2e" if up else "#c62828"
     bg = "#eaf5ec" if up else "#fbecec"
@@ -337,7 +350,7 @@ def chip(pct, diff, grande=False):
         dd = f'<div style="color:{col};font-size:11px;margin-top:3px;">{txt}</div>'
     return (f'<span style="display:inline-block;background:{bg};color:{col};'
             f'font-weight:700;font-size:{fs};padding:3px 9px;border-radius:20px;'
-            f'white-space:nowrap;">{s}{pct:.1f}%</span>{dd}')
+            f'white-space:nowrap;">{s}{pct:.1f}%{"*" if nota else ""}</span>{dd}')
 
 
 def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor, dia1, sin_tks, v12):
@@ -373,7 +386,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
           </td>
           <td style="padding:14px 12px;{BB}text-align:right;color:#111111;font-size:14px;">{money(r['sem26'])}</td>
           <td style="padding:14px 12px;{BB}text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
-          <td style="padding:14px 12px;{BB}text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25'])}</td>
+          <td style="padding:14px 12px;{BB}text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25']) if r['a25'] is not None else '—'}</td>
           <td style="padding:14px 18px;{BB}text-align:right;">{chip(r['pct'], r['diff'])}</td>
           <td style="padding:14px 16px 14px 10px;{BB}text-align:right;{C12}">{compact(v12[r['branch']])}</td>
         </tr>"""
@@ -392,7 +405,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['sem26'])}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['a26'])}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#7a8aa5;font-size:13px;">{money(s['a25'])}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'])}</td>
+          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'], nota=s.get('hay_nuevo'))}</td>
           <td style="padding:14px 16px 14px 10px;text-align:right;{C12}">{compact(v12val)}</td>
         </tr>"""
 
@@ -458,14 +471,14 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
 
   <!-- KPIs -->
   <tr><td style="padding:30px 32px 6px 32px;">
-    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;">CONSOLIDADO · 6 SUCURSALES</div>
+    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;">CONSOLIDADO · 9 SUCURSALES</div>
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
       <tr>
         <td width="33%" style="padding-right:7px;vertical-align:top;">
           <div style="background:#111111;border-radius:12px;padding:20px;height:126px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DE LA SEMANA</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['sem26'])}</div>
-            <div style="margin-top:8px;">{chip(totals['sem_pct'], totals['sem_diff'])}</div>
+            <div style="margin-top:8px;">{chip(totals['sem_pct'], totals['sem_diff'], nota=totals.get('hay_nuevo'))}</div>
           </div>
         </td>
         <td width="34%" style="padding:0 7px;vertical-align:top;">
@@ -479,7 +492,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
           <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:126px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">{a25_lbl}</div>
             <div style="color:#111111;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a25'])}</div>
-            <div style="margin-top:8px;">{chip(totals['pct'], totals['diff'])}</div>
+            <div style="margin-top:8px;">{chip(totals['pct'], totals['diff'], nota=totals.get('hay_nuevo'))}</div>
           </div>
         </td>
       </tr>
@@ -539,7 +552,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['sem26'])}</td>
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a26'])}</td>
           <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a25'])}</td>
-          <td style="padding:17px 18px;text-align:right;">{chip(totals['pct'], totals['diff'])}</td>
+          <td style="padding:17px 18px;text-align:right;">{chip(totals['pct'], totals['diff'], nota=totals.get('hay_nuevo'))}</td>
           <td style="padding:17px 16px 17px 10px;text-align:right;color:#ffffff;font-weight:800;font-size:13px;border-left:1px solid #3a3a3a;">{compact(v12_tot)}</td>
         </tr>
       </tbody>
@@ -554,7 +567,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
 
   <!-- FOOTER -->
   <tr><td style="background:#000000;padding:20px 32px;text-align:center;">
-    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S USA · Reporte automático generado el {date.today().strftime('%d/%m/%Y')}</div>
+    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S EUROPA · Reporte automático generado el {date.today().strftime('%d/%m/%Y')}</div>
   </td></tr>
 
 </table>
@@ -618,7 +631,7 @@ def main():
     marcar_enviada(desde, hasta, totals)
 
     subject = (f"Reporte Semanal {desde.strftime('%d/%m')} al {hasta.strftime('%d/%m/%Y')} "
-               f"- Lucciano's USA")
+               f"- Lucciano's Europa")
     _gh_out(send="true", subject=subject, week=f"{desde.isoformat()}..{hasta.isoformat()}")
 
     print(f"OK - semana {money(totals['sem26'])} ({totals['sem_pct']:+.1f}%) | "

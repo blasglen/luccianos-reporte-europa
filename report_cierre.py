@@ -25,7 +25,7 @@ from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
-from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, parse_excel_full
+from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, parse_excel_full, SIN_HISTORICO_2025
 from generar_acum_ant import acumular_rango, escribir_excel, espejo
 import mensual
 
@@ -206,23 +206,38 @@ def construir(dia1, ultimo):
 
     rows = []
     for b in BRANCH_ORDER:
-        a26, a25 = mes_act[b], round(mes_ant[b], 2)
-        diff = a26 - a25
-        r = {"branch": b, "a26": a26, "a25": a25, "diff": diff,
-             "pct": (diff / a25 * 100) if a25 else 0.0}
-        if tks_act:
-            t26, t25 = tks_act[b], mes_ant_tks[b]
-            r["tks26"], r["tks25"] = t26, t25
-            r["tp26"] = (a26 / t26) if t26 else 0.0
-            r["tp25"] = (a25 / t25) if t25 else 0.0
-            r["tp_pct"] = ((r["tp26"] - r["tp25"]) / r["tp25"] * 100) if r["tp25"] else 0.0
+        a26 = mes_act[b]
+        if b in SIN_HISTORICO_2025:
+            # Local nuevo 2026: no existia en el mes espejo de 2025. Sin comparable.
+            r = {"branch": b, "a26": a26, "a25": None, "diff": None, "pct": None,
+                 "comparable": False}
+            if tks_act:
+                t26 = tks_act[b]
+                r["tks26"], r["tks25"] = t26, 0
+                r["tp26"] = (a26 / t26) if t26 else 0.0
+                r["tp25"], r["tp_pct"] = None, None
+        else:
+            a25 = round(mes_ant[b], 2)
+            diff = a26 - a25
+            r = {"branch": b, "a26": a26, "a25": a25, "diff": diff,
+                 "pct": (diff / a25 * 100) if a25 else 0.0, "comparable": True}
+            if tks_act:
+                t26, t25 = tks_act[b], mes_ant_tks[b]
+                r["tks26"], r["tks25"] = t26, t25
+                r["tp26"] = (a26 / t26) if t26 else 0.0
+                r["tp25"] = (a25 / t25) if t25 else 0.0
+                r["tp_pct"] = ((r["tp26"] - r["tp25"]) / r["tp25"] * 100) if r["tp25"] else 0.0
         rows.append(r)
 
     def agregar(items):
+        comp = [r for r in items if r["comparable"]]
         t = {"a26": round(sum(r["a26"] for r in items), 2),
-             "a25": round(sum(r["a25"] for r in items), 2)}
-        t["diff"] = t["a26"] - t["a25"]
-        t["pct"] = (t["diff"] / t["a25"] * 100) if t["a25"] else 0.0
+             "a25": round(sum((r["a25"] or 0.0) for r in items), 2),
+             "hay_nuevo": any(not r["comparable"] for r in items)}
+        c26 = round(sum(r["a26"] for r in comp), 2)
+        c25 = round(sum(r["a25"] for r in comp), 2)
+        t["diff"] = c26 - c25
+        t["pct"] = (t["diff"] / c25 * 100) if c25 else 0.0
         return t
 
     totals = agregar(rows)
@@ -247,7 +262,11 @@ def construir(dia1, ultimo):
 
 
 # --- HTML -----------------------------------------------------------------------
-def chip(pct, diff, grande=False):
+def chip(pct, diff, grande=False, nota=False):
+    if pct is None:
+        return ('<span style="display:inline-block;background:#eeeeee;color:#8a8a8a;'
+                'font-weight:700;font-size:12px;padding:4px 11px;border-radius:20px;'
+                'white-space:nowrap;">s/ comp.</span>')
     up = pct >= 0
     col = "#1a7d2e" if up else "#c62828"
     bg = "#eaf5ec" if up else "#fbecec"
@@ -259,7 +278,7 @@ def chip(pct, diff, grande=False):
         dd = f'<div style="color:{col};font-size:11px;margin-top:4px;">{txt}</div>'
     return (f'<span style="display:inline-block;background:{bg};color:{col};'
             f'font-weight:700;font-size:{fs};padding:4px 11px;border-radius:20px;'
-            f'white-space:nowrap;">{s}{pct:.1f}%</span>{dd}')
+            f'white-space:nowrap;">{s}{pct:.1f}%{"*" if nota else ""}</span>{dd}')
 
 
 def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, ytd):
@@ -316,7 +335,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
             <div style="color:#9a9a9a;font-size:11px;font-weight:400;margin-top:2px;">{r['share']:.1f}% del total{'' if not con_tks else f" · ticket prom. {money(r['tp26'])}"}</div>
           </td>
           <td style="padding:14px 12px;text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
-          <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25'])}</td>
+          <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25']) if r['a25'] is not None else "—"}</td>
           <td style="padding:14px 18px;text-align:right;">{chip(r['pct'], r['diff'])}</td>
         </tr>"""
 
@@ -332,7 +351,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
           <td style="padding:14px 18px;font-weight:800;color:#1f3a6e;font-size:13px;">{nombre}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['a26'])}</td>
           <td style="padding:14px 12px;text-align:right;font-weight:800;color:#7a8aa5;font-size:13px;">{money(s['a25'])}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'])}</td>
+          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'], nota=s.get('hay_nuevo'))}</td>
         </tr>"""
 
     by_name = {r["branch"]: r for r in rows}
@@ -349,7 +368,8 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
     filas_ytd = ""
     for i, b in enumerate(BRANCH_ORDER):
         v, va = round(ytd["por26"][b], 2), round(ytd["por25"][b], 2)
-        dp = ((v - va) / va * 100) if va else 0.0
+        sc = (b in SIN_HISTORICO_2025) or (va == 0)
+        dp = None if sc else ((v - va) / va * 100)
         share = (v / ytd["t26"] * 100) if ytd["t26"] else 0.0
         z = "#ffffff" if i % 2 == 0 else "#fafafa"
         filas_ytd += f"""
@@ -375,7 +395,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
         <td width="50%" style="padding-left:7px;vertical-align:top;">
           <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:118px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VARIACI&Oacute;N INTERANUAL</div>
-            <div style="margin-top:12px;">{chip(ytd["pct"], ytd["diff"], grande=True)}</div>
+            <div style="margin-top:12px;">{chip(ytd["pct"], ytd["diff"], grande=True, nota=ytd.get("hay_nuevo"))}</div>
             <div style="color:#9a9a9a;font-size:11px;margin-top:10px;">{ytd["rango"]} {anio - 1} ({money(ytd["t25"])})</div>
           </div>
         </td>
@@ -420,7 +440,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
     <img src="cid:logo" alt="Lucciano's" width="190" style="display:block;margin:0 auto;max-width:190px;height:auto;">
     <div style="color:#bdbdbd;font-size:12px;letter-spacing:4px;margin-top:18px;">CIERRE MENSUAL DE VENTAS</div>
     <div style="color:#ffffff;font-size:17px;font-weight:800;letter-spacing:3px;margin-top:14px;">{mes_txt} {anio}</div>
-    <div style="color:#777777;font-size:11px;margin-top:8px;">mes completo · {dias_mes} días · 6 sucursales</div>
+    <div style="color:#777777;font-size:11px;margin-top:8px;">mes completo · {dias_mes} días · 9 sucursales</div>
   </td></tr>
 
   <!-- KPIs -->
@@ -493,7 +513,7 @@ def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tk
 {bloque_ytd}
   <!-- FOOTER -->
   <tr><td style="background:#000000;padding:20px 32px;text-align:center;">
-    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S USA · Reporte automático generado el {date.today().strftime('%d/%m/%Y')}</div>
+    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S EUROPA · Reporte automático generado el {date.today().strftime('%d/%m/%Y')}</div>
   </td></tr>
 
 </table>
@@ -549,9 +569,13 @@ def main():
     y26, ytks26 = mensual.ytd_por_sucursal(anio, mes)
     y25, _ = mensual.ytd_por_sucursal(anio - 1, mes)
     t26, t25 = round(sum(y26.values()), 2), round(sum(y25.values()), 2)
+    _comp = [b for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025]
+    _c26 = round(sum(y26[b] for b in _comp), 2)
+    _c25 = round(sum(y25[b] for b in _comp), 2)
     ytks = sum(ytks26.values())
     ytd = {"por26": y26, "por25": y25, "t26": t26, "t25": t25,
-           "diff": t26 - t25, "pct": ((t26 - t25) / t25 * 100) if t25 else 0.0,
+           "hay_nuevo": any(b in SIN_HISTORICO_2025 for b in BRANCH_ORDER),
+           "diff": _c26 - _c25, "pct": ((_c26 - _c25) / _c25 * 100) if _c25 else 0.0,
            "tks": ytks, "tp": (t26 / ytks) if ytks else 0.0,
            "lbl": f"{MES_CORTO[1].upper()}-{MES_CORTO[mes].upper()}",
            "rango": f"{MESES_ES[1].lower()} a {MESES_ES[mes].lower()}"}
@@ -574,7 +598,7 @@ def main():
                        encoding="utf-8")
     guardar_cierre(clave, dia1, ultimo, mes_act, mes_ant, totals)
 
-    subject = f"Cierre {MESES_ES[mes].capitalize()} {anio} - Lucciano's USA"
+    subject = f"Cierre {MESES_ES[mes].capitalize()} {anio} - Lucciano's Europa"
     _gh_out(send="true", subject=subject, mes=clave)
 
     print(f"OK - cierre {clave}: {money(totals['a26'])} vs {money(totals['a25'])} "

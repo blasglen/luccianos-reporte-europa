@@ -109,9 +109,10 @@ def save_accumulator(path, data):
 
 
 def money(v):
-    # Formato europeo: 28.975,69 €  (punto de miles, coma decimal, simbolo al final)
-    s = f"{v:,.2f}".replace(",", "·").replace(".", ",").replace("·", ".")
-    return f"{s} €"
+    # Sin decimales (redondeado) y con espacio DURO antes del €, para que el
+    # simbolo nunca caiga a otro renglon. Formato europeo: 28.976&nbsp;€
+    s = f"{round(v):,}".replace(",", ".")
+    return f"{s}\u00a0€"
 
 
 def build_report(ventas_path, acum25_path, acum_state_path):
