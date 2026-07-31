@@ -1,14 +1,14 @@
 name: Reporte de Ventas Semanal
 
 # DISPARADORES:
-#   1. repository_dispatch -> cron-job.org, VIERNES 7:30 AR (30 min despues del diario).
+#   1. repository_dispatch -> cron-job.org, LUNES 7:30 AR (30 min despues del diario).
 #   2. workflow_dispatch   -> boton manual.
 # Sin 'schedule': un solo disparador automatico. Este mail va a los SOCIOS, asi que
 # un duplicado seria feo. Igual queda el candado de data/semanal.json por si
 # cron-job.org reintenta el POST.
 on:
   repository_dispatch:
-    types: [reporte-semanal]
+    types: [reporte-semanal-europa]
   workflow_dispatch:
     inputs:
       hasta:
@@ -41,9 +41,9 @@ jobs:
       - name: Instalar dependencias
         run: pip install openpyxl matplotlib
 
-      # NO baja nada de TouchBistro: la semana sale del historial y el acumulado
+      # NO baja nada (no procesa PDF): la semana sale del historial y el acumulado
       # del mes sale de data/acumulado.json, los dos ya commiteados por el diario.
-      # Si el diario del jueves no corrio, este paso corta en rojo y no manda nada.
+      # Si el diario del domingo no corrio, este paso corta en rojo y no manda nada.
       - name: Generar reporte semanal
         id: gen
         run: |

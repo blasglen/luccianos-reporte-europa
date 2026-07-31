@@ -10,7 +10,7 @@ name: Reporte de Cierre Mensual
 # data/cierres.json para que el mes no se pierda nunca mas.
 on:
   repository_dispatch:
-    types: [reporte-cierre]
+    types: [reporte-cierre-europa]
   workflow_dispatch:
     inputs:
       mes:
