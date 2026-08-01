@@ -1,1 +1,32 @@
-{}
+{
+  "2026-07": {
+    "desde": "2026-07-01",
+    "hasta": "2026-07-31",
+    "total": 921326.8,
+    "total_anio_anterior": 784892.19,
+    "variacion_pct": -7.69,
+    "por_sucursal": {
+      "Barcelona 1": 208649.81,
+      "Barcelona 2": 80362.44,
+      "Madrid": 76521.89,
+      "Roma": 114027.23,
+      "Málaga 1": 108279.78,
+      "Málaga 3": 48423.51,
+      "Valencia": 144293.89,
+      "Alicante": 120263.48,
+      "Granada": 20504.77
+    },
+    "por_sucursal_anio_anterior": {
+      "Barcelona 1": 207531.3,
+      "Barcelona 2": 93178.4,
+      "Madrid": 0.0,
+      "Roma": 141710.59,
+      "Málaga 1": 120125.59,
+      "Málaga 3": 50437.08,
+      "Valencia": 139532.92,
+      "Alicante": 0.0,
+      "Granada": 32376.31
+    },
+    "cerrado": "2026-08-01T11:00:26+00:00"
+  }
+}
