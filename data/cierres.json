@@ -28,5 +28,35 @@
       "Granada": 32376.31
     },
     "cerrado": "2026-08-01T11:00:26+00:00"
+  },
+  "2026-08": {
+    "desde": "2026-08-01",
+    "hasta": "2026-08-31",
+    "total": 934150.09,
+    "total_anio_anterior": 841849.19,
+    "variacion_pct": -14.87,
+    "por_sucursal": {
+      "Barcelona 1": 207050.47,
+      "Barcelona 2": 81972.09,
+      "Madrid": 84131.06,
+      "Roma": 110741.47,
+      "Málaga 1": 114946.02,
+      "Málaga 3": 47605.37,
+      "Valencia": 131051.9,
+      "Alicante": 133391.49,
+      "Granada": 23260.22
+    },
+    "por_sucursal_anio_anterior": {
+      "Barcelona 1": 220153.21,
+      "Barcelona 2": 91388.1,
+      "Madrid": 0.0,
+      "Roma": 143057.21,
+      "Málaga 1": 136323.38,
+      "Málaga 3": 52740.65,
+      "Valencia": 149492.63,
+      "Alicante": 0.0,
+      "Granada": 48694.01
+    },
+    "cerrado": "2026-09-01T11:00:26+00:00"
   }
 }
