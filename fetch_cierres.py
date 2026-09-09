@@ -30,6 +30,7 @@ Secrets (GitHub Actions), igual esquema que USA:
 import email
 import imaplib
 import io
+import json
 import os
 import re
 import sys
@@ -42,6 +43,7 @@ import pdfplumber
 
 SENDER = os.environ.get("EU_SENDER", "informatica@luccianos.com.ar")
 SALIDA = Path(__file__).parent / "Ventas_ayer.xlsx"
+CIERRES_MANUALES = Path(__file__).parent / "data" / "cierres_manuales.json"
 IVA = 0.10  # neto = bruto / (1 + IVA). Un solo lugar donde vive la alicuota.
 
 # --- Locales ---------------------------------------------------------------
@@ -139,6 +141,31 @@ def escribir_xlsx(dia, neto, tickets):
     wb.save(SALIDA)
 
 
+def cierres_manuales(dia_objetivo):
+    """Cierres cargados a mano cuando un local no manda el PDF (PC caida, etc.).
+
+    Se agregan DESPUES de los PDF: si el cierre real llegara igual, gana el PDF
+    por el candado (pdv, dia) de consolidar(). La clave del JSON es la fecha, asi
+    que un dato viejo NO se re-aplica en dias futuros. El monto que se carga es el
+    BRUTO (igual que TOTAL VENTA BRUTA del PDF): consolidar() le aplica el /1.10.
+    """
+    if not CIERRES_MANUALES.exists():
+        return []
+    data = json.loads(CIERRES_MANUALES.read_text(encoding="utf-8"))
+    fuera = []
+    for c in data.get(dia_objetivo.isoformat(), []):
+        if c["local"] not in DISPLAY.values():
+            raise ValueError(f"Cierre manual con local invalido: {c['local']!r}. "
+                             f"Locales validos: {sorted(DISPLAY.values())}")
+        fuera.append({"local": c["local"], "pdv": str(c["pdv"]),
+                      "dia": dia_objetivo,
+                      "bruto": float(c["bruto"]), "tickets": int(c["tickets"])})
+    if fuera:
+        print(f"[AVISO] Inyecto {len(fuera)} cierre(s) manual(es) para "
+              f"{dia_objetivo}: {', '.join(c['local'] for c in fuera)}")
+    return fuera
+
+
 def main():
     user = os.environ["IMAP_USER"]
     pwd = os.environ["IMAP_APP_PASS"]
@@ -167,6 +194,8 @@ def main():
                 if c:
                     cierres.append(c)
     M.logout()
+
+    cierres += cierres_manuales(dia_objetivo)
 
     neto, tickets, usados = consolidar(cierres, dia_objetivo)
     escribir_xlsx(dia_objetivo, neto, tickets)
