@@ -27,6 +27,7 @@ Secrets (GitHub Actions), igual esquema que USA:
   IMAP_USER      -> reportesluccianos@gmail.com
   IMAP_APP_PASS  -> App Password de 16 caracteres de ESA casilla
 """
+import argparse
 import email
 import imaplib
 import io
@@ -167,16 +168,28 @@ def cierres_manuales(dia_objetivo):
 
 
 def main():
+    # Sin flags, se comporta EXACTAMENTE como antes (el cron diario no cambia):
+    # dia de negocio = ayer, ventana IMAP = 2 dias. Los flags son solo para el
+    # modo rescate de dias viejos (ej. Roma no mando el PDF y el dia no salio).
+    ap = argparse.ArgumentParser(description="Baja y consolida los cierres de un dia.")
+    ap.add_argument("--dia", help="Dia de negocio a recuperar (YYYY-MM-DD). Default: ayer.")
+    ap.add_argument("--ventana", type=int, default=2,
+                    help="Dias hacia atras para buscar en IMAP. Subilo para rescatar dias viejos.")
+    a = ap.parse_args()
+
     user = os.environ["IMAP_USER"]
     pwd = os.environ["IMAP_APP_PASS"]
     # Dia de negocio = ayer. Corremos 7:00 AR; a esa hora los cierres de anoche
     # (Europa va varias horas adelantada) ya entraron todos.
-    dia_objetivo = (datetime.now(timezone.utc) - timedelta(days=1)).date()
+    if a.dia:
+        dia_objetivo = datetime.strptime(a.dia, "%Y-%m-%d").date()
+    else:
+        dia_objetivo = (datetime.now(timezone.utc) - timedelta(days=1)).date()
 
     M = imaplib.IMAP4_SSL("imap.gmail.com")
     M.login(user, pwd)
     M.select("INBOX")
-    since = (datetime.utcnow() - timedelta(days=2)).strftime("%d-%b-%Y")
+    since = (datetime.utcnow() - timedelta(days=a.ventana)).strftime("%d-%b-%Y")
     typ, data = M.search(None, f'(FROM "{SENDER}" SINCE {since})')
     ids = data[0].split()
     if not ids:
