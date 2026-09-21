@@ -1,0 +1,92 @@
+name: Rescatar semana (backfill)
+
+# SOLO manual. Rescata dias que no salieron porque un local no mando el PDF
+# (tipico: Roma). Baja del mail los locales que SI llegaron y, para el que
+# falto, inyecta lo que este cargado en data/cierres_manuales.json.
+#
+# Uso: Actions -> "Rescatar semana (backfill)" -> Run workflow -> poner fechas.
+# Recomendado: primero con dry_run = true para ver que levanta, sin commitear.
+#
+# IMPORTANTE: antes de correr esto, cargar en data/cierres_manuales.json el
+# BRUTO y los tickets del local que no mando PDF, para CADA dia del rango.
+# Si falta, el fetch corta en rojo (no manda un dia incompleto).
+on:
+  workflow_dispatch:
+    inputs:
+      desde:
+        description: "Rescatar desde (YYYY-MM-DD)"
+        required: true
+        default: "2026-09-15"
+      hasta:
+        description: "Rescatar hasta (YYYY-MM-DD, inclusive)"
+        required: true
+        default: "2026-09-18"
+      ventana:
+        description: "Dias hacia atras para buscar en IMAP (que cubra el dia mas viejo)"
+        required: false
+        default: "12"
+      dry_run:
+        description: "Solo mostrar que levanta, sin commitear (true/false)"
+        required: false
+        default: "true"
+
+permissions:
+  contents: write
+
+# Mismo grupo que el resto: se serializa con el diario/semanal, no chocan pushes.
+concurrency:
+  group: reportes-luccianos
+  cancel-in-progress: false
+
+jobs:
+  rescatar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install openpyxl matplotlib pdfplumber
+
+      - name: Backfill dia por dia (mail + cierres manuales -> historial)
+        env:
+          IMAP_USER: ${{ secrets.IMAP_USER }}
+          IMAP_APP_PASS: ${{ secrets.IMAP_APP_PASS }}
+        run: |
+          set -euo pipefail
+          DESDE="${{ github.event.inputs.desde }}"
+          HASTA="${{ github.event.inputs.hasta }}"
+          VENTANA="${{ github.event.inputs.ventana }}"
+          d="$DESDE"
+          while [ "$d" != "$(date -d "$HASTA +1 day" +%F)" ]; do
+            echo "==================== $d ===================="
+            python fetch_cierres.py --dia "$d" --ventana "$VENTANA"
+            python historico.py
+            d="$(date -d "$d +1 day" +%F)"
+          done
+
+      - name: Reconstruir acumulado del mes
+        run: python rebuild_acumulado.py "$(echo '${{ github.event.inputs.hasta }}' | cut -c1-7)"
+
+      - name: Commitear rescate
+        if: github.event.inputs.dry_run != 'true'
+        run: |
+          git config user.name "luccianos-bot"
+          git config user.email "bot@luccianos.local"
+          git add data/historico_*.json data/acumulado.json Ventas_ayer.xlsx
+          if git diff --cached --quiet; then
+            echo "Sin cambios para commitear."
+          else
+            git commit -m "Backfill semana ${{ github.event.inputs.desde }}..${{ github.event.inputs.hasta }} [skip ci]"
+            git pull --rebase --autostash
+            git push
+          fi
+
+      - name: Aviso dry-run
+        if: github.event.inputs.dry_run == 'true'
+        run: echo "[DRY-RUN] Se levantaron los dias y se recalculo el acumulado, pero NO se commiteo nada. Revisar los totales de arriba y volver a correr con dry_run=false."
