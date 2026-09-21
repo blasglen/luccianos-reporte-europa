@@ -1,5 +1,21 @@
 {
   "2026-09-08": [
     { "local": "Málaga 1", "pdv": "202", "bruto": 3454.19, "tickets": 395 }
+  ],
+  "2026-09-15": [
+    { "local": "Roma", "pdv": "0001", "bruto": 3408.10, "tickets": 309 },
+    { "local": "Roma", "pdv": "0002", "bruto": 16.90, "tickets": 2 }
+  ],
+  "2026-09-16": [
+    { "local": "Roma", "pdv": "0001", "bruto": 2861.65, "tickets": 293 },
+    { "local": "Roma", "pdv": "0002", "bruto": 163.40, "tickets": 19 }
+  ],
+  "2026-09-17": [
+    { "local": "Roma", "pdv": "0001", "bruto": 3006.50, "tickets": 302 },
+    { "local": "Roma", "pdv": "0002", "bruto": 108.00, "tickets": 10 }
+  ],
+  "2026-09-18": [
+    { "local": "Roma", "pdv": "0001", "bruto": 3133.75, "tickets": 294 },
+    { "local": "Roma", "pdv": "0002", "bruto": 157.40, "tickets": 16 }
   ]
 }
