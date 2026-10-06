@@ -15,7 +15,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import openpyxl
 
@@ -40,6 +40,23 @@ FRANQUICIAS = ["Málaga 1", "Málaga 3", "Valencia", "Alicante", "Granada"]
 # Se muestran con "—" y "s/ comp." y quedan FUERA del calculo de la variacion %
 # (pero su venta 2026 SI suma al total, es plata real que entro).
 SIN_HISTORICO_2025 = {"Madrid", "Alicante"}
+
+# Dias de DESCANSO FIJO por local: {local: {dia_semana: vigente_desde}}.
+# dia_semana = date.weekday() -> lunes=0 ... domingo=6.
+# Ese dia, si el local no manda cierre, NO es un error: se registra en 0 y el
+# reporte sale igual. Si lo manda (ej. abre un feriado), el PDF se suma normal.
+# El "vigente_desde" evita que un rescate de un lunes VIEJO (cuando Granada si
+# abria) tome por bueno un 0 que en realidad es un PDF que se perdio.
+# Un solo lugar: lo leen fetch_cierres.py, report.py y report_semanal.py.
+DIAS_CERRADO = {
+    "Granada": {0: date(2026, 10, 5)},   # el encargado confirmo: los lunes ya no abre
+}
+
+
+def cerrado_por_descanso(local, fecha):
+    """True si 'fecha' es dia de descanso fijo del local (y la regla ya rige)."""
+    desde = DIAS_CERRADO.get(local, {}).get(fecha.weekday())
+    return desde is not None and fecha >= desde
 
 MESES_ES = {
     1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO",
@@ -193,7 +210,9 @@ def build_report(ventas_path, acum25_path, acum_state_path):
             diff = None
             pct = None
         rows.append({"branch": b, "dia": d, "a26": a26, "a25": a25,
-                     "diff": diff, "pct": pct, "comparable": comparable})
+                     "diff": diff, "pct": pct, "comparable": comparable,
+                     # Descanso fijo y sin venta: se muestra "cerrado" en vez de "0 €"
+                     "cerrado": d == 0 and cerrado_por_descanso(b, fecha)})
 
     def _agregar(grupo):
         """Suma un grupo de locales. La VENTA (dia/a26/a25) es real: incluye a los
@@ -279,10 +298,15 @@ def render_html(fecha, rows, totals, propias, franquicias):
         else:
             a25_cell = "—"
             var_cell = chip_sc()
+        if r.get("cerrado"):
+            dia_cell = ('<span style="color:#9a9a9a;font-size:12px;font-style:italic;">'
+                        'cerrado</span>')
+        else:
+            dia_cell = money(r["dia"])
         return f"""
         <tr style="background:{zebra};">
           <td style="padding:14px 18px;font-weight:700;color:#111111;font-size:14px;">{r['branch']}</td>
-          <td style="padding:14px 12px;text-align:right;color:#111111;font-size:14px;">{money(r['dia'])}</td>
+          <td style="padding:14px 12px;text-align:right;color:#111111;font-size:14px;">{dia_cell}</td>
           <td style="padding:14px 12px;text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
           <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{a25_cell}</td>
           <td style="padding:14px 18px;text-align:right;">{var_cell}</td>
@@ -313,6 +337,18 @@ def render_html(fecha, rows, totals, propias, franquicias):
                     f'{lista} abrieron en 2026, no tienen comparable (su venta sí suma al total).</div>')
     else:
         nota_pie = ""
+
+    # Locales que hoy no abrieron por descanso fijo (ej. Granada los lunes).
+    cerrados = [r["branch"] for r in rows if r.get("cerrado")]
+    abiertos = len(rows) - len(cerrados)
+    if cerrados:
+        lista_c = " y ".join(cerrados) if len(cerrados) <= 2 else ", ".join(cerrados[:-1]) + " y " + cerrados[-1]
+        verbo = "cierra" if len(cerrados) == 1 else "cierran"
+        nota_pie += (f'\n    <div style="color:#9a9a9a;font-size:11px;margin-top:8px;line-height:1.5;">'
+                     f'{lista_c} {verbo} los {DIAS_ES[fecha.weekday()].lower()} (descanso fijo): '
+                     f'hoy no tiene venta y no es un faltante.</div>')
+    sub_dia = (f"{abiertos} abiertas · {len(cerrados)} cerrada{'s' if len(cerrados) > 1 else ''}"
+               if cerrados else f"{len(rows)} sucursales")
 
     by_name = {r["branch"]: r for r in rows}
     cuerpo = ""
@@ -350,7 +386,7 @@ def render_html(fecha, rows, totals, propias, franquicias):
           <div style="background:#111111;border-radius:12px;padding:20px;height:150px;">
             <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DEL DÍA</div>
             <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['dia'])}</div>
-            <div style="color:#777777;font-size:11px;margin-top:6px;">9 sucursales</div>
+            <div style="color:#777777;font-size:11px;margin-top:6px;">{sub_dia}</div>
           </div>
         </td>
         <td width="34%" style="padding:0 7px;vertical-align:top;">

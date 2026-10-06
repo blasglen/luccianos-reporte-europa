@@ -67,6 +67,12 @@ Cada local puede tener varios puntos de venta (ej. Barcelona 2 = PDV 801/802/803
 `fetch_cierres.py` los suma por el campo `Sucursal:`. Si aparece un local que no está
 en la lista blanca, **revienta** en vez de ignorarlo.
 
+**Descansos fijos:** algunos locales no abren ciertos días (hoy: **Granada, los
+lunes**, desde el 05/10/2026). Se configuran en `DIAS_CERRADO` de `report.py`. Ese
+día, si el local no manda cierre, se registra en 0 y el reporte sale igual (en el
+mail figura "cerrado" + nota al pie). Si manda PDF igual (ej. abre un feriado), se
+suma normal. Cualquier OTRO día sin cierre sigue cortando en rojo.
+
 **Madrid y Alicante abrieron en 2026**: no tienen histórico 2025. Se muestran con
 "—" y chip gris `s/ comp.`, y quedan FUERA del cálculo de la variación % (pero su
 venta SÍ suma al total). Una nota al pie automática lo aclara.
@@ -95,5 +101,5 @@ venta SÍ suma al total). Una nota al pie automática lo aclara.
 
 - **Venta = neto** (bruto de los cierres ÷ 1.10, IVA 10%).
 - **Comparación interanual: mismas fechas calendario.**
-- **Ticket = cantidad de FACTURAS B** por local.
+- **Ticket = cantidad de FACTURAS A + FACTURAS B** por local (Barcelona 2 emite A desde el 23/09/2026). Las notas de crédito no cuentan.
 - Locales sin histórico 2025 → "—" y fuera del %.

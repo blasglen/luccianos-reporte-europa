@@ -27,6 +27,7 @@ from pathlib import Path
 
 from report import (
     BRANCH_ORDER, PROPIAS, FRANQUICIAS, MESES_ES, MES_CORTO, money, money2, parse_excel_full, SIN_HISTORICO_2025,
+    DIAS_ES, cerrado_por_descanso,
 )
 from generar_acum_ant import acumular_rango, escribir_excel, espejo
 import mensual
@@ -381,6 +382,22 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
     C12 = "border-left:1px solid #e2e2e2;color:#5f6b7a;font-weight:700;font-size:13px;"  # separador fino
     BB = "border-bottom:1px solid #e6e6e6;"  # linea divisoria entre locales
 
+    # Nota de descansos fijos: que locales no abrieron que dias de la semana.
+    # Importa para leer la variacion: el anio anterior SI abrian esos dias, asi
+    # que el % de ese local arrastra un dia menos de venta (efecto real, no error).
+    desc = {}
+    d = desde
+    while d <= hasta:
+        for b in BRANCH_ORDER:
+            if cerrado_por_descanso(b, d):
+                desc.setdefault(b, []).append(DIAS_ES[d.weekday()].lower())
+        d += timedelta(days=1)
+    nota_desc = "".join(
+        f" {b} no abre los {' y '.join(dict.fromkeys(ds))} (descanso fijo): esta semana "
+        f"tiene {len(ds)} día{'s' if len(ds) > 1 else ''} menos de venta que el año anterior, "
+        f"eso explica parte de su variación."
+        for b, ds in desc.items())
+
     def fila(r, zebra):
         return f"""
         <tr style="background:{zebra};">
@@ -566,7 +583,7 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
       Semana del {desde.strftime('%d/%m')} al {hasta.strftime('%d/%m')}, comparada contra {esp_sem}.
       Acumulado del mes comparado contra {esp_mes} (mismas fechas calendario del año anterior).
       La columna <b style="color:#0f1c33;">ACUM. ÚLT. 12M</b> es el acumulado de los últimos 12 meses cerrados por sucursal, en escala anual (no se compara con la semana ni con el mes).
-      Ventas netas (Net Sales), sin impuestos. Las dos unidades de Vineland se informan consolidadas.
+      Ventas netas, sin IVA.{nota_desc}
     </div>
   </td></tr>
 

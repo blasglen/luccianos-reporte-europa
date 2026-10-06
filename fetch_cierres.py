@@ -42,6 +42,8 @@ from pathlib import Path
 import openpyxl
 import pdfplumber
 
+from report import cerrado_por_descanso, DIAS_ES
+
 SENDER = os.environ.get("EU_SENDER", "informatica@luccianos.com.ar")
 SALIDA = Path(__file__).parent / "Ventas_ayer.xlsx"
 CIERRES_MANUALES = Path(__file__).parent / "data" / "cierres_manuales.json"
@@ -69,7 +71,11 @@ LOCALES_ESPERADOS = set(DISPLAY.values())
 RE_SUC = re.compile(r"Sucursal:\s*(.+?)\s+Punto (?:de venta|vendita)\s+(\d+)")
 RE_DIA = re.compile(r"(?:INICIO DE CAJA|APERTURA DI CASSA)\s+(\d{2}/\d{2}/\d{4})")
 RE_VENTA = re.compile(r"(?:TOTAL VENTA BRUTA|TOTALE VENDITA LORDA)\s+([\-\d.]+)")
-RE_TICK = re.compile(r"(?:FACTURAS B|FATTURE B)\s+[\-\d.]+\s+(\d+)")
+# Tickets = facturas emitidas, sean A o B. Desde el 23/09/2026 los PDV de
+# Barcelona 2 (801-804) emiten FACTURAS A en vez de B; con la regex vieja (solo B)
+# sus tickets quedaban en 0 aunque la venta estaba bien. Las notas de credito
+# ("N. CRED. B") NO matchean a proposito: no son clientes nuevos.
+RE_TICK = re.compile(r"(?:FACTURAS|FATTURE) [AB]\s+[\-\d.]+\s+(\d+)")
 
 
 def parse_pdf(data):
@@ -92,7 +98,7 @@ def parse_pdf(data):
             bruto = float(m.group(1))          # TOTAL VENTA BRUTA ya = facturas - notas de credito
         m = RE_TICK.search(ln)
         if m:
-            tickets = int(m.group(1))          # cantidad de FACTURAS B = tickets
+            tickets += int(m.group(1))         # SUMA A + B: si un PDV emite las dos, cuentan ambas
     if suc is None or dia is None:
         return None
     if suc not in DISPLAY:
@@ -118,6 +124,17 @@ def consolidar(cierres, dia_objetivo):
         neto[c["local"]] += c["bruto"] / (1 + IVA)
         tickets[c["local"]] += c["tickets"]
         usados += 1
+
+    # Locales con DESCANSO FIJO ese dia (ej. Granada los lunes): si no mandaron
+    # cierre, no es un faltante. Se registran en 0 para que el dia quede completo
+    # en el historial (el semanal exige los 7 dias) y el reporte salga igual.
+    # Si SI mandaron PDF (abrieron un feriado), ya estan en 'neto' y no se tocan.
+    for local in sorted(LOCALES_ESPERADOS - set(neto.keys())):
+        if cerrado_por_descanso(local, dia_objetivo):
+            neto[local] += 0.0
+            tickets[local] += 0
+            print(f"[INFO] {local}: sin cierre el {dia_objetivo} por descanso fijo "
+                  f"({DIAS_ES[dia_objetivo.weekday()].lower()}). Se registra en 0.")
 
     faltan = LOCALES_ESPERADOS - set(neto.keys())
     if faltan:
