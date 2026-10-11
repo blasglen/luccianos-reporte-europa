@@ -1,15 +1,15 @@
 {
   "month": "2026-10",
-  "last_date": "2026-10-09",
+  "last_date": "2026-10-10",
   "acumulado": {
-    "Barcelona 1": 31496.77,
-    "Barcelona 2": 13556.83,
-    "Madrid": 13753.92,
-    "Roma": 37817.1,
-    "Málaga 1": 24088.63,
-    "Málaga 3": 6341.7,
-    "Valencia": 29748.91,
-    "Alicante": 26471.74,
-    "Granada": 4235.8
+    "Barcelona 1": 34284.86,
+    "Barcelona 2": 16080.06,
+    "Madrid": 16971.1,
+    "Roma": 41960.01,
+    "Málaga 1": 28183.88,
+    "Málaga 3": 7704.52,
+    "Valencia": 34758.12,
+    "Alicante": 31003.42,
+    "Granada": 5552.98
   }
 }
