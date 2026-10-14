@@ -1,0 +1,4 @@
+{
+  "_como_usar": "Dias puntuales en que un local NO abre (fuera de su descanso fijo). Formato: \"AAAA-MM-DD\": [\"Local\"]. Nombres validos: Barcelona 1, Barcelona 2, Madrid, Roma, Málaga 1, Málaga 3, Valencia, Alicante, Granada.",
+  "2026-10-13": ["Granada"]
+}
