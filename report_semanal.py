@@ -382,19 +382,27 @@ def render_html(desde, hasta, rows, totals, propias, franquicias, serie, mejor, 
     C12 = "border-left:1px solid #e2e2e2;color:#5f6b7a;font-weight:700;font-size:13px;"  # separador fino
     BB = "border-bottom:1px solid #e6e6e6;"  # linea divisoria entre locales
 
-    # Nota de descansos fijos: que locales no abrieron que dias de la semana.
-    # Importa para leer la variacion: el anio anterior SI abrian esos dias, asi
-    # que el % de ese local arrastra un dia menos de venta (efecto real, no error).
+    # Nota de descansos: que locales NO abrieron que dias de la semana.
+    # Se mira el historial (venta 0 + dia de descanso) y no solo el calendario,
+    # porque un feriado puede correr el descanso: ej. Granada abre el lunes
+    # feriado y cierra el martes. Importa para leer la variacion: el anio
+    # anterior SI abrian esos dias (un dia menos de venta = efecto real).
+    hist = {}
     desc = {}
     d = desde
     while d <= hasta:
+        if d.year not in hist:
+            p = BASE / "data" / f"historico_{d.year}.json"
+            hist[d.year] = json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
+        dia_h = hist[d.year].get(d.isoformat(), {})
         for b in BRANCH_ORDER:
-            if cerrado_por_descanso(b, d):
-                desc.setdefault(b, []).append(DIAS_ES[d.weekday()].lower())
+            vta = (dia_h.get(b) or {}).get("venta", 0)
+            if cerrado_por_descanso(b, d) and not vta:
+                desc.setdefault(b, []).append(f"{DIAS_ES[d.weekday()].lower()} {d.day}")
         d += timedelta(days=1)
     nota_desc = "".join(
-        f" {b} no abre los {' y '.join(dict.fromkeys(ds))} (descanso fijo): esta semana "
-        f"tiene {len(ds)} día{'s' if len(ds) > 1 else ''} menos de venta que el año anterior, "
+        f" {b} no abrió el {' y el '.join(ds)} (descanso): esta semana tiene {len(ds)} "
+        f"día{'s' if len(ds) > 1 else ''} menos de venta que el año anterior, "
         f"eso explica parte de su variación."
         for b, ds in desc.items())
 

@@ -73,6 +73,12 @@ día, si el local no manda cierre, se registra en 0 y el reporte sale igual (en 
 mail figura "cerrado" + nota al pie). Si manda PDF igual (ej. abre un feriado), se
 suma normal. Cualquier OTRO día sin cierre sigue cortando en rojo.
 
+**Descansos puntuales:** si un local cierra un día fuera de su descanso fijo
+(ej. feriado el lunes: Granada abre el lunes y descansa el martes), se carga en
+`data/descansos_puntuales.json` desde la web de GitHub (lápiz ✏️ → editar →
+Commit), con el formato `"2026-10-13": ["Granada"]`. Si el diario ya cortó, después
+de cargarlo se vuelve a correr *Reporte de Ventas Diario* **ese mismo día**.
+
 **Madrid y Alicante abrieron en 2026**: no tienen histórico 2025. Se muestran con
 "—" y chip gris `s/ comp.`, y quedan FUERA del cálculo de la variación % (pero su
 venta SÍ suma al total). Una nota al pie automática lo aclara.

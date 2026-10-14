@@ -42,7 +42,7 @@ from pathlib import Path
 import openpyxl
 import pdfplumber
 
-from report import cerrado_por_descanso, DIAS_ES
+from report import motivo_cierre, DIAS_ES
 
 SENDER = os.environ.get("EU_SENDER", "informatica@luccianos.com.ar")
 SALIDA = Path(__file__).parent / "Ventas_ayer.xlsx"
@@ -130,11 +130,12 @@ def consolidar(cierres, dia_objetivo):
     # en el historial (el semanal exige los 7 dias) y el reporte salga igual.
     # Si SI mandaron PDF (abrieron un feriado), ya estan en 'neto' y no se tocan.
     for local in sorted(LOCALES_ESPERADOS - set(neto.keys())):
-        if cerrado_por_descanso(local, dia_objetivo):
+        motivo = motivo_cierre(local, dia_objetivo)
+        if motivo:
             neto[local] += 0.0
             tickets[local] += 0
-            print(f"[INFO] {local}: sin cierre el {dia_objetivo} por descanso fijo "
-                  f"({DIAS_ES[dia_objetivo.weekday()].lower()}). Se registra en 0.")
+            print(f"[INFO] {local}: sin cierre el {dia_objetivo} "
+                  f"({DIAS_ES[dia_objetivo.weekday()].lower()}) por descanso {motivo}. Se registra en 0.")
 
     faltan = LOCALES_ESPERADOS - set(neto.keys())
     if faltan:

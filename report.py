@@ -53,10 +53,50 @@ DIAS_CERRADO = {
 }
 
 
-def cerrado_por_descanso(local, fecha):
-    """True si 'fecha' es dia de descanso fijo del local (y la regla ya rige)."""
+# Cierres PUNTUALES (un dia concreto): ej. un feriado cae lunes, Granada abre
+# el lunes y descansa el martes. Se cargan en data/descansos_puntuales.json,
+# que se edita desde la web de GitHub sin tocar codigo:
+#     "2026-10-13": ["Granada"]
+DESCANSOS_PUNTUALES = Path(__file__).parent / "data" / "descansos_puntuales.json"
+_puntuales_cache = None
+
+
+def descansos_puntuales():
+    """{date: set(locales)}. Valida fechas y nombres para que un typo corte claro."""
+    global _puntuales_cache
+    if _puntuales_cache is None:
+        _puntuales_cache = {}
+        if DESCANSOS_PUNTUALES.exists():
+            data = json.loads(DESCANSOS_PUNTUALES.read_text(encoding="utf-8"))
+            for k, locales in data.items():
+                if k.startswith("_"):          # claves de ayuda/comentario
+                    continue
+                try:
+                    f = date.fromisoformat(k)
+                except ValueError:
+                    raise SystemExit(f"[ERROR] descansos_puntuales.json: fecha invalida {k!r} "
+                                     f"(formato AAAA-MM-DD).")
+                malos = [l for l in locales if l not in BRANCH_ORDER]
+                if malos:
+                    raise SystemExit(f"[ERROR] descansos_puntuales.json ({k}): local invalido "
+                                     f"{malos}. Validos: {', '.join(BRANCH_ORDER)}.")
+                _puntuales_cache[f] = set(locales)
+    return _puntuales_cache
+
+
+def motivo_cierre(local, fecha):
+    """'puntual' / 'fijo' si ese dia el local esta de descanso; None si debe abrir."""
+    if local in descansos_puntuales().get(fecha, set()):
+        return "puntual"
     desde = DIAS_CERRADO.get(local, {}).get(fecha.weekday())
-    return desde is not None and fecha >= desde
+    if desde is not None and fecha >= desde:
+        return "fijo"
+    return None
+
+
+def cerrado_por_descanso(local, fecha):
+    """True si 'fecha' es dia de descanso (fijo o puntual) del local."""
+    return motivo_cierre(local, fecha) is not None
 
 MESES_ES = {
     1: "ENERO", 2: "FEBRERO", 3: "MARZO", 4: "ABRIL", 5: "MAYO", 6: "JUNIO",
@@ -338,15 +378,25 @@ def render_html(fecha, rows, totals, propias, franquicias):
     else:
         nota_pie = ""
 
-    # Locales que hoy no abrieron por descanso fijo (ej. Granada los lunes).
+    # Locales que hoy no abrieron por descanso (fijo o puntual).
     cerrados = [r["branch"] for r in rows if r.get("cerrado")]
     abiertos = len(rows) - len(cerrados)
-    if cerrados:
-        lista_c = " y ".join(cerrados) if len(cerrados) <= 2 else ", ".join(cerrados[:-1]) + " y " + cerrados[-1]
-        verbo = "cierra" if len(cerrados) == 1 else "cierran"
-        nota_pie += (f'\n    <div style="color:#9a9a9a;font-size:11px;margin-top:8px;line-height:1.5;">'
-                     f'{lista_c} {verbo} los {DIAS_ES[fecha.weekday()].lower()} (descanso fijo): '
+
+    def _lista(xs):
+        return " y ".join(xs) if len(xs) <= 2 else ", ".join(xs[:-1]) + " y " + xs[-1]
+
+    fijos = [b for b in cerrados if motivo_cierre(b, fecha) == "fijo"]
+    puntuales = [b for b in cerrados if motivo_cierre(b, fecha) == "puntual"]
+    estilo = 'color:#9a9a9a;font-size:11px;margin-top:8px;line-height:1.5;'
+    if fijos:
+        verbo = "cierra" if len(fijos) == 1 else "cierran"
+        nota_pie += (f'\n    <div style="{estilo}">{_lista(fijos)} {verbo} los '
+                     f'{DIAS_ES[fecha.weekday()].lower()} (descanso fijo): '
                      f'hoy no tiene venta y no es un faltante.</div>')
+    if puntuales:
+        verbo = "no abrió" if len(puntuales) == 1 else "no abrieron"
+        nota_pie += (f'\n    <div style="{estilo}">{_lista(puntuales)} {verbo} hoy '
+                     f'(descanso corrido de día por un feriado): no es un faltante.</div>')
     sub_dia = (f"{abiertos} abiertas · {len(cerrados)} cerrada{'s' if len(cerrados) > 1 else ''}"
                if cerrados else f"{len(rows)} sucursales")
 
