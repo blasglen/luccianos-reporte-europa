@@ -263,267 +263,8 @@ def construir(dia1, ultimo):
 
 
 # --- HTML -----------------------------------------------------------------------
-def chip(pct, diff, grande=False, nota=False):
-    if pct is None:
-        return ('<span style="display:inline-block;background:#eeeeee;color:#8a8a8a;'
-                'font-weight:700;font-size:12px;padding:4px 11px;border-radius:20px;'
-                'white-space:nowrap;">s/ comp.</span>')
-    up = pct >= 0
-    col = "#1a7d2e" if up else "#c62828"
-    bg = "#eaf5ec" if up else "#fbecec"
-    s = "+" if up else ""
-    fs = "17px" if grande else "12px"
-    dd = ""
-    if diff:
-        txt = f"(+{money(diff)})" if diff >= 0 else f"({money(diff)})"
-        dd = f'<div style="color:{col};font-size:11px;margin-top:4px;">{txt}</div>'
-    return (f'<span style="display:inline-block;background:{bg};color:{col};'
-            f'font-weight:700;font-size:{fs};padding:4px 11px;border-radius:20px;'
-            f'white-space:nowrap;">{s}{pct:.1f}%{"*" if nota else ""}</span>{dd}')
-
-
-def render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, ytd):
-    anio = ultimo.year
-    mes_txt = MESES_ES[ultimo.month]
-    a26_lbl = f"{MES_CORTO[ultimo.month].upper()}/{str(anio)[2:]}"
-    a25_lbl = f"{MES_CORTO[ultimo.month].upper()}/{str(anio - 1)[2:]}"
-    dias_mes = ultimo.day
-    prom = totals["a26"] / dias_mes
-
-    texto_cal, n_act, n_ant = composicion(dia1, ultimo)
-    nota_cal = ""
-    if texto_cal:
-        nota_cal = (f'<div style="background:#fff8e6;border-left:3px solid #e0a800;'
-                    f'border-radius:6px;padding:12px 14px;margin-top:16px;color:#6b5200;'
-                    f'font-size:12px;line-height:1.6;">'
-                    f'<b>Nota sobre el calendario.</b> {texto_cal}</div>')
-
-    if not con_tks:
-        banda_tks = ('<div style="background:#fbecec;border-radius:12px;padding:14px 18px;'
-                     'color:#c62828;font-size:12px;">Sin datos de tickets para este mes: '
-                     'el historial diario no cubre el período completo. La venta no está afectada.</div>')
-    else:
-        banda_tks = f"""
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td width="50%" style="padding-right:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:18px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">TICKETS DEL MES</div>
-            <table role="presentation" width="100%"><tr>
-              <td style="color:#111111;font-size:20px;font-weight:800;padding-top:6px;">{totals['tks26']:,}</td>
-              <td style="text-align:right;">{chip(totals['tks_pct'], 0)}</td>
-            </tr></table>
-            <div style="color:#9a9a9a;font-size:11px;margin-top:2px;">{totals['tks25']:,} en {anio - 1}</div>
-          </div>
-        </td>
-        <td width="50%" style="padding-left:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:18px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">TICKET PROMEDIO</div>
-            <table role="presentation" width="100%"><tr>
-              <td style="color:#111111;font-size:20px;font-weight:800;padding-top:6px;">{money2(totals['tp26'])}</td>
-              <td style="text-align:right;">{chip(totals['tp_pct'], 0)}</td>
-            </tr></table>
-            <div style="color:#9a9a9a;font-size:11px;margin-top:2px;">{money2(totals['tp25'])} en {anio - 1}</div>
-          </div>
-        </td>
-      </tr>
-    </table>"""
-
-    def fila(r, zebra):
-        return f"""
-        <tr style="background:{zebra};">
-          <td style="padding:14px 18px;font-weight:700;color:#111111;font-size:14px;">{r['branch']}
-            <div style="color:#9a9a9a;font-size:11px;font-weight:400;margin-top:2px;">{r['share']:.1f}% del total{'' if not con_tks else f" · ticket prom. {money2(r['tp26'])}"}</div>
-          </td>
-          <td style="padding:14px 12px;text-align:right;color:#111111;font-weight:700;font-size:14px;">{money(r['a26'])}</td>
-          <td style="padding:14px 12px;text-align:right;color:#9a9a9a;font-size:14px;">{money(r['a25']) if r['a25'] is not None else "—"}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(r['pct'], r['diff'])}</td>
-        </tr>"""
-
-    def encabezado_grupo(nombre):
-        return f"""
-        <tr style="background:#eef1f6;">
-          <td colspan="4" style="padding:9px 18px;color:#1f3a6e;font-size:10px;font-weight:800;letter-spacing:2px;">{nombre}</td>
-        </tr>"""
-
-    def fila_subtotal(nombre, s):
-        return f"""
-        <tr style="background:#f5f5f5;border-top:1px solid #e2e2e2;">
-          <td style="padding:14px 18px;font-weight:800;color:#1f3a6e;font-size:13px;">{nombre}</td>
-          <td style="padding:14px 12px;text-align:right;font-weight:800;color:#1f3a6e;font-size:13px;">{money(s['a26'])}</td>
-          <td style="padding:14px 12px;text-align:right;font-weight:800;color:#7a8aa5;font-size:13px;">{money(s['a25'])}</td>
-          <td style="padding:14px 18px;text-align:right;">{chip(s['pct'], s['diff'], nota=s.get('hay_nuevo'))}</td>
-        </tr>"""
-
-    by_name = {r["branch"]: r for r in rows}
-    cuerpo = encabezado_grupo("PROPIAS")
-    for i, b in enumerate(PROPIAS):
-        cuerpo += fila(by_name[b], "#ffffff" if i % 2 == 0 else "#fafafa")
-    cuerpo += fila_subtotal("Subtotal Propias", propias)
-    cuerpo += encabezado_grupo("FRANQUICIAS")
-    for i, b in enumerate(FRANQUICIAS):
-        cuerpo += fila(by_name[b], "#ffffff" if i % 2 == 0 else "#fafafa")
-    cuerpo += fila_subtotal("Subtotal Franquicias", franquicias)
-
-    # --- Bloque ACUMULADO DEL AÑO (YTD calendario) ---
-    filas_ytd = ""
-    for i, b in enumerate(BRANCH_ORDER):
-        v, va = round(ytd["por26"][b], 2), round(ytd["por25"][b], 2)
-        sc = (b in SIN_HISTORICO_2025) or (va == 0)
-        dp = None if sc else ((v - va) / va * 100)
-        share = (v / ytd["t26"] * 100) if ytd["t26"] else 0.0
-        z = "#ffffff" if i % 2 == 0 else "#fafafa"
-        filas_ytd += f"""
-        <tr style="background:{z};">
-          <td style="padding:11px 16px;color:#111111;font-size:13px;font-weight:600;">{b}<span style="color:#9a9a9a;font-size:11px;font-weight:400;"> &middot; {share:.1f}%</span></td>
-          <td style="padding:11px 12px;text-align:right;color:#111111;font-size:13px;">{money(v)}</td>
-          <td style="padding:11px 16px;text-align:right;">{chip(dp, 0)}</td>
-        </tr>"""
-    bloque_ytd = f"""
-  <!-- YTD -->
-  <tr><td style="padding:26px 32px 6px 32px;">
-    <div style="border-top:2px solid #0f1c33;padding-top:22px;">
-      <div style="color:#0f1c33;font-size:12px;letter-spacing:3px;font-weight:800;">ACUMULADO DEL A&Ntilde;O &middot; INTERANUAL</div>
-      <div style="color:#9a9a9a;font-size:11px;margin-top:4px;line-height:1.5;">Acumulado del a&ntilde;o calendario hasta el mes cerrado ({ytd["rango"]} {anio}) contra el mismo per&iacute;odo de {anio - 1}.</div>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;"><tr>
-        <td width="50%" style="padding-right:7px;vertical-align:top;">
-          <div style="background:#0f1c33;border-radius:12px;padding:20px;height:118px;">
-            <div style="color:#8ea6cf;font-size:10px;letter-spacing:1px;">ACUM. {ytd["lbl"]} {anio}</div>
-            <div style="color:#ffffff;font-size:24px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(ytd["t26"])}</div>
-            <div style="color:#8ea6cf;font-size:11px;margin-top:8px;">ticket prom. {money(ytd["tp"])} &middot; {ytd["tks"]:,} tickets</div>
-          </div>
-        </td>
-        <td width="50%" style="padding-left:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:118px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VARIACI&Oacute;N INTERANUAL</div>
-            <div style="margin-top:12px;">{chip(ytd["pct"], ytd["diff"], grande=True, nota=ytd.get("hay_nuevo"))}</div>
-            <div style="color:#9a9a9a;font-size:11px;margin-top:10px;">{ytd["rango"]} {anio - 1} ({money(ytd["t25"])})</div>
-          </div>
-        </td>
-      </tr></table>
-      <div style="background:#fafafa;border-radius:12px;padding:18px 20px;margin-top:16px;">
-        <div style="color:#9a9a9a;font-size:11px;letter-spacing:2px;margin-bottom:4px;">VENTA MENSUAL &middot; {ytd["lbl"]} {anio} vs {anio - 1}</div>
-        <div style="color:#9a9a9a;font-size:11px;margin-bottom:8px;line-height:1.5;">Cada par de barras es un mes (a&ntilde;o anterior vs actual); arriba, el acumulado del a&ntilde;o de cada uno.</div>
-        <img src="cid:ytd" alt="Acumulado del a&ntilde;o" width="536" style="display:block;width:100%;max-width:536px;height:auto;">
-      </div>
-      <div style="margin-top:16px;">
-        <div style="color:#9a9a9a;font-size:11px;letter-spacing:2px;margin-bottom:10px;">POR SUCURSAL &middot; ACUMULADO DEL A&Ntilde;O vs {anio - 1}</div>
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-radius:10px;overflow:hidden;box-shadow:0 1px 5px rgba(0,0,0,0.05);">
-          <thead><tr style="background:#0f1c33;">
-            <th style="padding:11px 16px;text-align:left;color:#ffffff;font-size:10px;letter-spacing:1px;">SUCURSAL &middot; PART.</th>
-            <th style="padding:11px 12px;text-align:right;color:#ffffff;font-size:10px;letter-spacing:1px;">ACUM. A&Ntilde;O</th>
-            <th style="padding:11px 16px;text-align:right;color:#ffffff;font-size:10px;letter-spacing:1px;">vs. A&Ntilde;O ANT.</th>
-          </tr></thead>
-          <tbody>{filas_ytd}
-            <tr style="background:#0f1c33;">
-              <td style="padding:13px 16px;font-weight:800;color:#ffffff;font-size:13px;">TOTAL</td>
-              <td style="padding:13px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:13px;">{money(ytd["t26"])}</td>
-              <td style="padding:13px 16px;text-align:right;">{chip(ytd["pct"], 0)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div style="background:#fff8e6;border-left:3px solid #e0a800;border-radius:6px;padding:11px 14px;margin-top:14px;color:#6b5200;font-size:11px;line-height:1.6;"><b>C&oacute;mo leerlo.</b> Es el acumulado del a&ntilde;o calendario a la misma fecha en los dos a&ntilde;os, as&iacute; que compara lo que va del a&ntilde;o contra el a&ntilde;o pasado a esta altura.</div>
-    </div>
-  </td></tr>
-"""
-    return f"""<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#eeeeee;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eeeeee;">
-<tr><td align="center" style="padding:24px 12px;">
-
-<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="width:600px;max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;box-shadow:0 6px 24px rgba(0,0,0,0.12);">
-
-  <!-- HEADER -->
-  <tr><td style="background:#000000;padding:38px 32px 32px 32px;text-align:center;">
-    <img src="cid:logo" alt="Lucciano's" width="190" style="display:block;margin:0 auto;max-width:190px;height:auto;">
-    <div style="color:#bdbdbd;font-size:12px;letter-spacing:4px;margin-top:18px;">CIERRE MENSUAL DE VENTAS</div>
-    <div style="color:#ffffff;font-size:17px;font-weight:800;letter-spacing:3px;margin-top:14px;">{mes_txt} {anio}</div>
-    <div style="color:#777777;font-size:11px;margin-top:8px;">mes completo · {dias_mes} días · 9 sucursales</div>
-  </td></tr>
-
-  <!-- KPIs -->
-  <tr><td style="padding:30px 32px 6px 32px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-      <tr>
-        <td width="33%" style="padding-right:7px;vertical-align:top;">
-          <div style="background:#111111;border-radius:12px;padding:20px;height:150px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DE {a26_lbl}</div>
-            <div style="color:#ffffff;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a26'])}</div>
-            <div style="color:#777777;font-size:11px;margin-top:6px;">promedio {money(prom)}/día</div>
-          </div>
-        </td>
-        <td width="34%" style="padding:0 7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:150px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VENTA DE {a25_lbl}</div>
-            <div style="color:#111111;font-size:22px;font-weight:800;margin-top:8px;letter-spacing:-0.5px;">{money(totals['a25'])}</div>
-            <div style="color:#9a9a9a;font-size:10px;margin-top:6px;">{ia.strftime('%d/%m')} al {fa.strftime('%d/%m/%Y')}</div>
-          </div>
-        </td>
-        <td width="33%" style="padding-left:7px;vertical-align:top;">
-          <div style="background:#f5f5f5;border-radius:12px;padding:20px;height:150px;">
-            <div style="color:#9a9a9a;font-size:10px;letter-spacing:1px;">VARIACIÓN INTERANUAL</div>
-            <div style="margin-top:14px;">{chip(totals['pct'], totals['diff'], grande=True, nota=totals.get('hay_nuevo'))}</div>
-            {f'<div style="color:#9a9a9a;font-size:11px;margin-top:10px;line-height:1.5;">{money(totals["ca26"])} vs {money(totals["ca25"])}<br>{sum(1 for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025)} locales comparables</div>' if totals.get('hay_nuevo') else ''}
-          </div>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
-
-  <!-- TICKETS -->
-  <tr><td style="padding:18px 32px 6px 32px;">
-    {banda_tks}
-  </td></tr>
-
-  <!-- COMPARATIVO -->
-  <tr><td style="padding:22px 32px 6px 32px;">
-    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;margin-bottom:12px;">COMPARATIVO POR SUCURSAL · {str(anio)[2:]} vs {str(anio - 1)[2:]}</div>
-    <img src="cid:comparativo" alt="Comparativo por sucursal" width="536" style="display:block;width:100%;max-width:536px;height:auto;">
-  </td></tr>
-
-  <!-- DETALLE -->
-  <tr><td style="padding:24px 32px 36px 32px;">
-    <div style="color:#9a9a9a;font-size:11px;letter-spacing:3px;margin-bottom:14px;">DETALLE POR SUCURSAL</div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-radius:12px;overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,0.06);">
-      <thead>
-        <tr style="background:#111111;">
-          <th style="padding:13px 18px;text-align:left;color:#ffffff;font-size:10px;letter-spacing:1px;font-weight:700;">SUCURSAL</th>
-          <th style="padding:13px 12px;text-align:right;color:#ffffff;font-size:10px;letter-spacing:1px;font-weight:700;">{a26_lbl}</th>
-          <th style="padding:13px 12px;text-align:right;color:#ffffff;font-size:10px;letter-spacing:1px;font-weight:700;">{a25_lbl}</th>
-          <th style="padding:13px 18px;text-align:right;color:#ffffff;font-size:10px;letter-spacing:1px;font-weight:700;">VARIACIÓN</th>
-        </tr>
-      </thead>
-      <tbody>{cuerpo}
-        <tr style="background:#111111;">
-          <td style="padding:17px 18px;font-weight:800;color:#ffffff;font-size:14px;">TOTAL {a26_lbl}</td>
-          <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a26'])}</td>
-          <td style="padding:17px 12px;text-align:right;font-weight:800;color:#ffffff;font-size:14px;">{money(totals['a25'])}</td>
-          <td style="padding:17px 18px;text-align:right;">{chip(totals['pct'], totals['diff'])}</td>
-        </tr>
-      </tbody>
-    </table>
-    {nota_cal}
-    <div style="color:#9a9a9a;font-size:11px;margin-top:14px;line-height:1.6;">
-      Mes cerrado del {dia1.strftime('%d/%m')} al {ultimo.strftime('%d/%m/%Y')}, comparado contra
-      {ia.strftime('%d/%m')} al {fa.strftime('%d/%m/%Y')} (mismas fechas calendario del año anterior).
-      Ventas netas (Net Sales), sin impuestos. Las dos unidades de Vineland se informan consolidadas.
-    </div>
-  </td></tr>
-{bloque_ytd}
-  <!-- FOOTER -->
-  <tr><td style="background:#000000;padding:20px 32px;text-align:center;">
-    <div style="color:#777777;font-size:11px;letter-spacing:1px;">LUCCIANO'S EUROPA · Reporte automático generado el {date.today().strftime('%d/%m/%Y')}</div>
-  </td></tr>
-
-</table>
-
-</td></tr>
-</table>
-</body>
-</html>"""
+# El HTML lo arma mail_cierre.py (diseño "combinado", oct/2026). La version
+# anterior (render_html + graficos PNG de charts.py) quedo en el historial de git.
 
 
 def _gh_out(**kv):
@@ -582,22 +323,26 @@ def main():
            "lbl": f"{MES_CORTO[1].upper()}-{MES_CORTO[mes].upper()}",
            "rango": f"{MESES_ES[1].lower()} a {MESES_ES[mes].lower()}"}
 
-    # Saque el grafico de "progreso": en un mes cerrado son las mismas dos barras
-    # que ya estan en las KPI y en el comparativo. Un cierre tiene que ser concreto.
-    from charts import chart_comparativo, chart_ytd
-    d = BASE / "charts"
-    d.mkdir(exist_ok=True)
-    chart_comparativo(rows, f"{MES_CORTO[mes]}/{str(anio)[2:]}",
-                      f"{MES_CORTO[mes]}/{str(anio - 1)[2:]}", d / "cierre_comparativo.png")
-    # Grafico YTD: barras por mes (ene..mes), anio anterior vs actual
+    # Mail (diseño "combinado"): lo arma mail_cierre.py. Ya no lleva graficos PNG:
+    # barras y graficos son tablas HTML. El unico adjunto es el logo.
+    import mail_cierre
     master = mensual.cargar()
     labels = [MES_CORTO[m] for m in range(1, mes + 1)]
     v_ant = [sum(master[f"{anio - 1}-{m:02d}"][b]["venta"] for b in BRANCH_ORDER) for m in range(1, mes + 1)]
     v_act = [sum(master[f"{anio}-{m:02d}"][b]["venta"] for b in BRANCH_ORDER) for m in range(1, mes + 1)]
-    chart_ytd(labels, v_ant, v_act, t25, t26, str(anio - 1), str(anio), d / "cierre_ytd.png")
+    # Mes anterior (para "vs agosto"): si es enero, diciembre del anio anterior
+    pa, pm = (anio, mes - 1) if mes > 1 else (anio - 1, 12)
+    clave_prev = f"{pa}-{pm:02d}"
+    mes_prev = None
+    if clave_prev in master:
+        mes_prev = (f"{MESES_ES[pm].lower()} {pa}",
+                    round(sum(master[clave_prev][b]["venta"] for b in BRANCH_ORDER), 2))
+    texto_cal, _, _ = composicion(dia1, ultimo)
 
-    PREVIEW.write_text(render_html(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, ytd),
-                       encoding="utf-8")
+    PREVIEW.write_text(
+        mail_cierre.render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, ytd,
+                           texto_cal, list(zip(labels, v_act, v_ant)), mes_prev),
+        encoding="utf-8")
     guardar_cierre(clave, dia1, ultimo, mes_act, mes_ant, totals)
 
     subject = f"Cierre {MESES_ES[mes].capitalize()} {anio} - Lucciano's Europa"

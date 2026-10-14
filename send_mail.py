@@ -63,7 +63,14 @@ def send(subject, html, to=None, imagenes=None, mail_to_env="MAIL_TO"):
     alt.attach(MIMEText(html, "html", "utf-8"))
     root.attach(alt)
 
+    # Solo se adjuntan las imagenes que el HTML usa (cid:<nombre>). Los workflows del
+    # semanal y del cierre todavia pasan los PNG de charts/, pero desde el rediseño
+    # "combinado" los graficos son tablas HTML: sin este filtro esos PNG llegarian
+    # como adjuntos sueltos al final del mail.
     for cid, path in (imagenes if imagenes is not None else INLINE_IMAGES):
+        if f"cid:{cid}" not in html:
+            print(f"[INFO] cid:{cid} no se usa en el HTML; no se adjunta {path}.")
+            continue
         _attach_inline(root, cid, path)
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
