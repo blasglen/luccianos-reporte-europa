@@ -1,21 +1,103 @@
 {
   "2026-09-08": [
-    { "local": "Málaga 1", "pdv": "202", "bruto": 3454.19, "tickets": 395 }
+    {
+      "local": "Málaga 1",
+      "pdv": "202",
+      "bruto": 3454.19,
+      "tickets": 395
+    }
   ],
   "2026-09-15": [
-    { "local": "Roma", "pdv": "0001", "bruto": 3408.10, "tickets": 309 },
-    { "local": "Roma", "pdv": "0002", "bruto": 16.90, "tickets": 2 }
+    {
+      "local": "Roma",
+      "pdv": "0001",
+      "bruto": 3408.1,
+      "tickets": 309
+    },
+    {
+      "local": "Roma",
+      "pdv": "0002",
+      "bruto": 16.9,
+      "tickets": 2
+    }
   ],
   "2026-09-16": [
-    { "local": "Roma", "pdv": "0001", "bruto": 2861.65, "tickets": 293 },
-    { "local": "Roma", "pdv": "0002", "bruto": 163.40, "tickets": 19 }
+    {
+      "local": "Roma",
+      "pdv": "0001",
+      "bruto": 2861.65,
+      "tickets": 293
+    },
+    {
+      "local": "Roma",
+      "pdv": "0002",
+      "bruto": 163.4,
+      "tickets": 19
+    }
   ],
   "2026-09-17": [
-    { "local": "Roma", "pdv": "0001", "bruto": 3006.50, "tickets": 302 },
-    { "local": "Roma", "pdv": "0002", "bruto": 108.00, "tickets": 10 }
+    {
+      "local": "Roma",
+      "pdv": "0001",
+      "bruto": 3006.5,
+      "tickets": 302
+    },
+    {
+      "local": "Roma",
+      "pdv": "0002",
+      "bruto": 108.0,
+      "tickets": 10
+    }
   ],
   "2026-09-18": [
-    { "local": "Roma", "pdv": "0001", "bruto": 3133.75, "tickets": 294 },
-    { "local": "Roma", "pdv": "0002", "bruto": 157.40, "tickets": 16 }
+    {
+      "local": "Roma",
+      "pdv": "0001",
+      "bruto": 3133.75,
+      "tickets": 294
+    },
+    {
+      "local": "Roma",
+      "pdv": "0002",
+      "bruto": 157.4,
+      "tickets": 16
+    }
+  ],
+  "2026-10-15": [
+    {
+      "local": "Málaga 1",
+      "pdv": "201",
+      "bruto": 0,
+      "tickets": 0,
+      "pisar": true,
+      "_nota": "El PDF del PDV 201 que abre el 15/10 trae la caja del 15 al 18 (25,40). Se cargo en el 18; esto evita sumarlo dos veces si se rescata el 15."
+    }
+  ],
+  "2026-10-17": [
+    {
+      "local": "Málaga 1",
+      "pdv": "202",
+      "bruto": 3765.74,
+      "tickets": 416,
+      "pisar": true,
+      "_nota": "ESTIMADO. Caja del 17 y 18 cerrada junta (PDF del 202: 7971,47 / 884 tk). Repartido 47.2% viernes segun las 2 semanas previas. Reemplazar por el dato real si el local lo pasa."
+    }
+  ],
+  "2026-10-18": [
+    {
+      "local": "Málaga 1",
+      "pdv": "202",
+      "bruto": 4205.73,
+      "tickets": 468,
+      "pisar": true,
+      "_nota": "ESTIMADO. Resto del cierre conjunto 17-18 del PDV 202."
+    },
+    {
+      "local": "Málaga 1",
+      "pdv": "201",
+      "bruto": 25.4,
+      "tickets": 3,
+      "_nota": "Caja del PDV 201 del 15 al 18 (cerro el 19 a las 00:13). Se carga entera en el 18."
+    }
   ]
 }
