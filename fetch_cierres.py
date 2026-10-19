@@ -70,6 +70,9 @@ LOCALES_ESPERADOS = set(DISPLAY.values())
 # Regex bilingues (ES / IT).
 RE_SUC = re.compile(r"Sucursal:\s*(.+?)\s+Punto (?:de venta|vendita)\s+(\d+)")
 RE_DIA = re.compile(r"(?:INICIO DE CAJA|APERTURA DI CASSA)\s+(\d{2}/\d{2}/\d{4})")
+# Fecha de CIERRE de la caja (misma linea que la apertura). Sirve para detectar
+# cajas que abarcan varios dias (el local no cerro la caja un dia).
+RE_CIERRE = re.compile(r"(?:CIERRE|CHIUSURA):\s*(\d{2}/\d{2}/\d{4})")
 RE_VENTA = re.compile(r"(?:TOTAL VENTA BRUTA|TOTALE VENDITA LORDA)\s+([\-\d.]+)")
 # Tickets = facturas emitidas, sean A o B. Desde el 23/09/2026 los PDV de
 # Barcelona 2 (801-804) emiten FACTURAS A en vez de B; con la regex vieja (solo B)
@@ -83,7 +86,7 @@ def parse_pdf(data):
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         txt = "\n".join((p.extract_text() or "") for p in pdf.pages)
 
-    suc = pdv = dia = None
+    suc = pdv = dia = cierre = None
     bruto = 0.0
     tickets = 0
     for ln in txt.splitlines():
@@ -93,6 +96,9 @@ def parse_pdf(data):
         m = RE_DIA.search(ln)
         if m and dia is None:
             dia = datetime.strptime(m.group(1), "%d/%m/%Y").date()
+        m = RE_CIERRE.search(ln)
+        if m and cierre is None:
+            cierre = datetime.strptime(m.group(1), "%d/%m/%Y").date()
         m = RE_VENTA.search(ln)
         if m:
             bruto = float(m.group(1))          # TOTAL VENTA BRUTA ya = facturas - notas de credito
@@ -104,7 +110,7 @@ def parse_pdf(data):
     if suc not in DISPLAY:
         raise ValueError(f"Local desconocido en un PDF: {suc!r} (PDV {pdv}). "
                          f"Agregalo a DISPLAY o revisa el cierre.")
-    return {"local": DISPLAY[suc], "pdv": pdv, "dia": dia,
+    return {"local": DISPLAY[suc], "pdv": pdv, "dia": dia, "cierre": cierre,
             "bruto": bruto, "tickets": tickets}
 
 
@@ -139,6 +145,16 @@ def consolidar(cierres, dia_objetivo):
 
     faltan = LOCALES_ESPERADOS - set(neto.keys())
     if faltan:
+        # Pista: si el local no cerro la caja un dia, su PDF abre un dia y cierra
+        # dos o mas dias despues, y queda fechado por la APERTURA. Ej.: abre el 17,
+        # cierra el 19 a las 00:12 -> las ventas del 17 y del 18 vienen juntas.
+        for c in cierres:
+            if (c["local"] in faltan and c.get("cierre")
+                    and c["dia"] < dia_objetivo < c["cierre"]):
+                print(f"[PISTA] {c['local']} PDV {c['pdv']}: la caja abrio el {c['dia']} y cerro el "
+                      f"{c['cierre']}. No cerraron la caja un dia: las ventas del {dia_objetivo} estan "
+                      f"dentro de ese cierre (fechado {c['dia']}). Hay que separarlas con cierres "
+                      f"manuales \"pisar\": true en data/cierres_manuales.json.")
         raise SystemExit(
             f"[ERROR] Faltan cierres del {dia_objetivo} para: {', '.join(sorted(faltan))}. "
             f"No genero Ventas_ayer.xlsx (prefiero cortar antes que mandar un total incompleto)."
@@ -163,10 +179,15 @@ def escribir_xlsx(dia, neto, tickets):
 def cierres_manuales(dia_objetivo):
     """Cierres cargados a mano cuando un local no manda el PDF (PC caida, etc.).
 
-    Se agregan DESPUES de los PDF: si el cierre real llegara igual, gana el PDF
-    por el candado (pdv, dia) de consolidar(). La clave del JSON es la fecha, asi
-    que un dato viejo NO se re-aplica en dias futuros. El monto que se carga es el
-    BRUTO (igual que TOTAL VENTA BRUTA del PDF): consolidar() le aplica el /1.10.
+    Normal: se agregan DESPUES de los PDF; si el cierre real llegara igual, gana el
+    PDF por el candado (pdv, dia) de consolidar().
+    Con "pisar": true: se ponen ANTES de los PDF y le ganan al PDF de ese mismo
+    PDV y dia. Es para cuando el PDF existe pero esta mal (ej. una caja que abarca
+    dos dias: el PDF trae todo junto con la fecha del primero; se carga a mano lo
+    que corresponde a cada dia y el PDF queda ignorado).
+    La clave del JSON es la fecha, asi que un dato viejo NO se re-aplica en dias
+    futuros. Se carga el BRUTO (igual que TOTAL VENTA BRUTA): consolidar() le
+    aplica el /1.10. Las claves que empiezan con "_" son notas y se ignoran.
     """
     if not CIERRES_MANUALES.exists():
         return []
@@ -177,7 +198,7 @@ def cierres_manuales(dia_objetivo):
             raise ValueError(f"Cierre manual con local invalido: {c['local']!r}. "
                              f"Locales validos: {sorted(DISPLAY.values())}")
         fuera.append({"local": c["local"], "pdv": str(c["pdv"]),
-                      "dia": dia_objetivo,
+                      "dia": dia_objetivo, "pisar": bool(c.get("pisar")),
                       "bruto": float(c["bruto"]), "tickets": int(c["tickets"])})
     if fuera:
         print(f"[AVISO] Inyecto {len(fuera)} cierre(s) manual(es) para "
@@ -226,7 +247,10 @@ def main():
                     cierres.append(c)
     M.logout()
 
-    cierres += cierres_manuales(dia_objetivo)
+    manuales = cierres_manuales(dia_objetivo)
+    # Los "pisar" van primero: el candado (pdv, dia) se queda con el primero que ve.
+    cierres = ([c for c in manuales if c["pisar"]] + cierres +
+               [c for c in manuales if not c["pisar"]])
 
     neto, tickets, usados = consolidar(cierres, dia_objetivo)
     escribir_xlsx(dia_objetivo, neto, tickets)
