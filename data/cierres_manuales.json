@@ -99,5 +99,15 @@
       "tickets": 3,
       "_nota": "Caja del PDV 201 del 15 al 18 (cerro el 19 a las 00:13). Se carga entera en el 18."
     }
+  ],
+  "2026-11-04": [
+    {
+      "local": "Valencia",
+      "pdv": "601",
+      "bruto": 1189.19,
+      "tickets": 156,
+      "pisar": true,
+      "_nota": "Cargado de la planilla de caja del sistema (04/11, PDV 0601): FACTURAS A 1189,19 / 156. El PDF no llego a la casilla. pisar=true: si despues llega un PDF del 601 fechado el 4, no se cuenta dos veces."
+    }
   ]
 }
