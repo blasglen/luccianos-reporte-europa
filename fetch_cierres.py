@@ -145,16 +145,38 @@ def consolidar(cierres, dia_objetivo):
 
     faltan = LOCALES_ESPERADOS - set(neto.keys())
     if faltan:
-        # Pista: si el local no cerro la caja un dia, su PDF abre un dia y cierra
-        # dos o mas dias despues, y queda fechado por la APERTURA. Ej.: abre el 17,
-        # cierra el 19 a las 00:12 -> las ventas del 17 y del 18 vienen juntas.
-        for c in cierres:
-            if (c["local"] in faltan and c.get("cierre")
-                    and c["dia"] < dia_objetivo < c["cierre"]):
-                print(f"[PISTA] {c['local']} PDV {c['pdv']}: la caja abrio el {c['dia']} y cerro el "
-                      f"{c['cierre']}. No cerraron la caja un dia: las ventas del {dia_objetivo} estan "
-                      f"dentro de ese cierre (fechado {c['dia']}). Hay que separarlas con cierres "
-                      f"manuales \"pisar\": true en data/cierres_manuales.json.")
+        # Ayuda para diagnosticar (solo imprime, no cambia nada):
+        # 1) Que PDF de ese local SI hay en la casilla, con sus fechas.
+        # 2) Si alguno PODRIA ser una caja de varios dias (abre antes del dia que
+        #    falta y su fecha de CIERRE es posterior). Es solo una sospecha: la
+        #    fecha de CIERRE del PDF a veces es cuando se GENERO o REENVIO el PDF,
+        #    no cuando se cerro la caja (paso con Valencia PDV 602 el 05/11/2026:
+        #    decia "cierre 05/11" y la caja se habia cerrado normal el 03/11).
+        #    Por eso se pide verificar en la planilla de caja antes de cargar nada.
+        for local in sorted(faltan):
+            propios = sorted((c for c in cierres if c["local"] == local),
+                             key=lambda c: (c["dia"], c["pdv"]))
+            if not propios:
+                print(f"[PISTA] {local}: no hay NINGUN PDF de este local en la casilla de los "
+                      f"ultimos dias. O no lo mandaron, o todavia no llego.")
+                continue
+            vistos_txt = "; ".join(
+                f"PDV {c['pdv']} abre {c['dia']:%d/%m}"
+                + (f", cierre {c['cierre']:%d/%m}" if c.get("cierre") else "")
+                + f", {c['bruto']:.2f} bruto" for c in propios)
+            print(f"[PISTA] {local}: en la casilla hay -> {vistos_txt}. "
+                  f"Ninguno corresponde al {dia_objetivo:%d/%m}.")
+            for c in propios:
+                if c.get("cierre") and c["dia"] < dia_objetivo < c["cierre"]:
+                    print(f"[PISTA] {local} PDV {c['pdv']}: POSIBLE caja de varios dias (abre "
+                          f"{c['dia']:%d/%m}, el PDF dice cierre {c['cierre']:%d/%m}). OJO: puede ser "
+                          f"falsa alarma, la fecha de cierre a veces es la del reenvio del PDF.")
+            print(f"[PISTA] Verificalo en la planilla de caja: sucursal {local}, fecha "
+                  f"{dia_objetivo:%d/%m/%Y}, cada punto de venta. "
+                  f"(a) Si algun PDV muestra venta ese dia -> es el cierre que falta: cargarlo "
+                  f"en data/cierres_manuales.json. "
+                  f"(b) Si ninguno tiene caja ese dia y la caja de un dia anterior trae las ventas "
+                  f"juntas -> caja de varios dias: separarla con cierres manuales \"pisar\": true.")
         raise SystemExit(
             f"[ERROR] Faltan cierres del {dia_objetivo} para: {', '.join(sorted(faltan))}. "
             f"No genero Ventas_ayer.xlsx (prefiero cortar antes que mandar un total incompleto)."
