@@ -225,6 +225,31 @@ def build_report(ventas_path, acum25_path, acum_state_path):
         print(f"[SKIP] La fecha {fecha} ya fue procesada. No se suma de nuevo ni se envia mail.")
         sys.exit(0)
 
+    # Proteccion anti HUECOS: el dia a procesar tiene que ser el SIGUIENTE al ultimo
+    # procesado. Si un dia no corrio (ej. el 09/11/2026 cron-job.org no disparo y el
+    # domingo 8 quedo sin procesar), sumar el dia siguiente dejaria el acumulado del
+    # mes corto SIN AVISAR. Mejor cortar y rescatar primero los dias que faltan.
+    if state.get("last_date"):
+        ultimo = datetime.strptime(state["last_date"], "%Y-%m-%d").date()
+        esperado = ultimo + timedelta(days=1)
+        if fecha != esperado:
+            gh_out = os.environ.get("GITHUB_OUTPUT")
+            if gh_out:
+                with open(gh_out, "a", encoding="utf-8") as f:
+                    f.write("send=false\n")
+            if fecha < ultimo:
+                print(f"[ERROR] El dia a procesar ({fecha}) es ANTERIOR al ultimo procesado ({ultimo}). "
+                      f"No se envia nada. Para corregir dias pasados se usa 'Rescatar semana'.")
+            else:
+                faltan = [(ultimo + timedelta(days=i)).isoformat()
+                          for i in range(1, (fecha - ultimo).days)]
+                print(f"[ERROR] Hay un HUECO: el ultimo dia procesado es {ultimo} y ahora toca {fecha}. "
+                      f"Faltan: {', '.join(faltan)}. No se suma {fecha} para no dejar el acumulado corto.")
+                print(f"        Arreglo: Actions -> 'Rescatar semana (backfill)' desde {faltan[0]} hasta "
+                      f"{fecha.isoformat()} (dry_run false). Eso carga todo y deja el acumulado al dia; "
+                      f"el mail de esos dias no sale, pero el semanal los incluye.")
+            sys.exit(1)
+
     # Reinicio mensual: si cambio el mes (o es la primera corrida), el acumulado arranca en cero.
     if state.get("month") != mes_actual:
         print(f"[MES NUEVO] {state.get('month')} -> {mes_actual}. Acumulado reiniciado a cero.")
