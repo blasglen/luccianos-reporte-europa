@@ -143,6 +143,35 @@ def leer_acum_mes(hasta):
             f"[ERROR] El acumulado del diario es del mes {st.get('month')} y el "
             f"cierre de esta semana es {mes_esperado}. No se manda."
         )
+    # El diario puede ir ADELANTADO (ej. el semanal se corre tarde, o un rescate dejo
+    # el acumulado al dia): en ese caso el acumulado al domingo es el acumulado actual
+    # MENOS los dias posteriores, que estan en el historial. La conciliacion de abajo
+    # igual compara contra el historial, asi que el control sigue siendo completo.
+    ultimo = st.get("last_date")
+    if ultimo and ultimo > hasta.isoformat() and ultimo[:7] == mes_esperado:
+        hist = {}
+        p_hist = BASE / "data" / f"historico_{hasta.year}.json"
+        if p_hist.exists():
+            hist = json.loads(p_hist.read_text(encoding="utf-8"))
+        ult = datetime.strptime(ultimo, "%Y-%m-%d").date()
+        posteriores = [(hasta + timedelta(days=i)).isoformat() for i in range(1, (ult - hasta).days + 1)]
+        sin_hist = [d for d in posteriores if d not in hist]
+        if sin_hist:
+            raise SystemExit(
+                f"[ERROR] El acumulado del diario esta al {ultimo} (despues del {hasta.isoformat()}) y "
+                f"al historial le faltan {', '.join(sin_hist)} para descontarlos. No se manda.")
+        acum = dict(st.get("acumulado", {}))
+        for d in posteriores:
+            for b, v in hist[d].items():
+                venta = v["venta"] if isinstance(v, dict) else float(v)
+                acum[b] = round(acum.get(b, 0.0) - venta, 2)
+        print(f"[INFO] El acumulado del diario esta al {ultimo}; descuento {', '.join(posteriores)} "
+              f"(del historial) para tenerlo al {hasta.isoformat()}.")
+        faltan = [b for b in BRANCH_ORDER if b not in acum]
+        if faltan:
+            raise SystemExit(f"[ERROR] El acumulado del diario no tiene: {', '.join(faltan)}")
+        return {b: round(float(acum[b]), 2) for b in BRANCH_ORDER}
+
     if st.get("last_date") != hasta.isoformat():
         raise SystemExit(
             f"[ERROR] El acumulado del diario esta cerrado al {st.get('last_date')} "
