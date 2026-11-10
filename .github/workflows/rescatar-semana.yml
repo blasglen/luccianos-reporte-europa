@@ -83,8 +83,15 @@ jobs:
             echo "Sin cambios para commitear."
           else
             git commit -m "Backfill semana ${{ github.event.inputs.desde }}..${{ github.event.inputs.hasta }} [skip ci]"
-            git pull --rebase --autostash
-            git push
+            # Reintento: si GitHub falla un momento (ej. 'Internal Server Error' del 04/11/2026,
+            # que dejo el martes 3 de USA sin guardar aunque el mail ya habia salido), se
+            # vuelve a intentar hasta 5 veces, esperando cada vez un poco mas.
+            for i in 1 2 3 4 5; do
+              if git pull --rebase --autostash && git push; then break; fi
+              if [ "$i" -eq 5 ]; then echo "[ERROR] No se pudo guardar en el repo despues de 5 intentos."; exit 1; fi
+              echo "[AVISO] Fallo el guardado (intento $i de 5). Reintento en $((i*15)) segundos..."
+              sleep $((i*15))
+            done
           fi
 
       - name: Aviso dry-run
