@@ -1,8 +1,13 @@
 """
-mail_base.py — Diseño común de los mails de Lucciano's Europa (diario, semanal,
-cierre mensual). Paleta, formatos, componentes y el "inliner".
+mail_base.py — Diseño común de los mails de Lucciano's (diario, semanal, cierre
+mensual). Paleta, formatos, componentes y el "inliner".
 
-Un cambio de estilo se hace ACA y lo toman los tres reportes.
+ESTE ARCHIVO (y mail_diario / mail_semanal / mail_cierre) ES IDENTICO EN LOS
+REPOS DE EUROPA Y USA. Lo que cambia entre regiones lo define cada report.py:
+    MONEDA = "USD" / "EUR"     (si no esta, EUR)
+    REGION = "USA" / "Europa"  (si no esta, Europa)
+    SIN_HISTORICO_2025, motivo_cierre  (solo Europa: locales nuevos y descansos)
+Un cambio de diseño se hace aca y se copia igual al otro repo.
 
 Como se dibuja un mail (para que se vea bien en Gmail y Outlook):
   - Se escribe con clases + la hoja CSS_BASE. Al final `documento()` pasa todo
@@ -31,34 +36,74 @@ MES_C = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct
 NB = "\u00a0"  # espacio que no corta: "28.228 €" nunca se parte en dos renglones
 BASE = Path(__file__).parent
 
+import report as _rep
+
+MONEDA = getattr(_rep, "MONEDA", "EUR")
+REGION = getattr(_rep, "REGION", "Europa")
+NUEVOS = set(getattr(_rep, "SIN_HISTORICO_2025", set()))   # locales sin anio anterior
+USD = MONEDA == "USD"
+SEP_MIL, SEP_DEC = (",", ".") if USD else (".", ",")
+TXT_NETO = "Ventas netas sin impuestos" if USD else "Ventas netas sin IVA"
+
+
+def motivo_cierre(local, fecha):
+    """'fijo' / 'puntual' si el local esta de descanso ese dia (solo Europa)."""
+    fn = getattr(_rep, "motivo_cierre", None)
+    return fn(local, fecha) if fn else None
+
+
+def cerrado_por_descanso(local, fecha):
+    return motivo_cierre(local, fecha) is not None
+
 
 # ================================================================ FORMATOS ==
-def eur(v, dec=0, signo=False):
-    s = f"{abs(v):,.{dec}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+def _n(v, dec=0):
+    """Numero con los separadores de la region: 28.228,50 (EUR) / 28,228.50 (USD)."""
+    s = f"{abs(v):,.{dec}f}"
+    return s if USD else s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def plata(v, dec=0, signo=False):
+    """Importe con la moneda de la region: '28.228 €' / '$28,228'. Negativos con '−'."""
     pre = "−" if v < 0 and round(abs(v), dec) else ("+" if signo and v > 0 else "")
-    return f"{pre}{s}{NB}€"
+    return f"{pre}${_n(v, dec)}" if USD else f"{pre}{_n(v, dec)}{NB}€"
 
 
-def eur_corto(v, euro=False):
-    """1.820.000 -> '1,82 M€' · 934.000 -> '934k' (o '934 k€') · 4.700 -> '4,7k'.
-    Para graficos, donde no entra el numero completo."""
+def plata_corta(v, moneda=False):
+    """Para graficos, donde no entra el numero completo:
+    EUR: '1,82 M€' · '934k' (o '934 k€') · '4,7k'   USD: '$1.82M' · '$934k' · '$4.7k'."""
     a = abs(v)
-    k = f"{NB}k€" if euro else "k"
+
+    def d(x, n):
+        t = f"{x:.{n}f}"
+        return t if USD else t.replace(".", ",")
+    if USD:
+        if a >= 1e6:
+            return f"${d(v / 1e6, 2)}M"
+        if a >= 1e4:
+            return f"${d(v / 1e3, 0)}k"
+        if a >= 1e3:
+            return f"${d(v / 1e3, 1)}k"
+        return f"${v:.0f}"
+    k = f"{NB}k€" if moneda else "k"
     if a >= 1e6:
-        return f"{v / 1e6:.2f}".replace(".", ",") + f"{NB}M€"
+        return f"{d(v / 1e6, 2)}{NB}M€"
     if a >= 1e4:
-        return f"{v / 1e3:.0f}{k}"
+        return f"{d(v / 1e3, 0)}{k}"
     if a >= 1e3:
-        return f"{v / 1e3:.1f}".replace(".", ",") + k
-    return f"{v:.0f}" + (f"{NB}€" if euro else "")
+        return f"{d(v / 1e3, 1)}{k}"
+    return f"{v:.0f}" + (f"{NB}€" if moneda else "")
+
+
+eur, eur_corto = plata, plata_corta   # nombres viejos (por si algo los usa)
 
 
 def pct(v):
-    return ("+" if v >= 0 else "−") + f"{abs(v):.1f}".replace(".", ",") + "%"
+    return ("+" if v >= 0 else "−") + f"{abs(v):.1f}".replace(".", SEP_DEC) + "%"
 
 
 def num(v):
-    return f"{v:,.0f}".replace(",", ".")
+    return _n(v, 0)
 
 
 def chip(v, extra=""):
@@ -87,11 +132,24 @@ def historico(anio):
 
 
 def _master():
-    """{fecha: {local: venta_neta}} del master del anio anterior (una sola lectura)."""
+    """{fecha: {sucursal: venta_neta}} del master del anio anterior (una sola lectura).
+    Europa: el master trae bruto con IVA por local. USA: trae venta neta por codigo
+    de venue ('001'...), que se pasa a sucursal con CODE_TO_TBKEY + VENUE_MAP."""
     if not _master_cache:
-        from generar_acum_ant import _leer_master, IVA
-        for f, locs in _leer_master().items():
-            _master_cache[f] = {l: round(b / (1 + IVA), 2) for l, (b, _tk) in locs.items()}
+        import generar_acum_ant as g
+        datos = g._leer_master()
+        if hasattr(g, "CODE_TO_TBKEY"):
+            vmap = getattr(_rep, "VENUE_MAP", {})
+            for f, locs in datos.items():
+                out = {}
+                for cod, (v, _tk) in locs.items():
+                    b = vmap.get(g.CODE_TO_TBKEY.get(cod, ""), cod)
+                    out[b] = round(out.get(b, 0) + v, 2)
+                _master_cache[f] = out
+        else:
+            iva = getattr(g, "IVA", 0.0)
+            for f, locs in datos.items():
+                _master_cache[f] = {l: round(b / (1 + iva), 2) for l, (b, _tk) in locs.items()}
     return _master_cache
 
 
@@ -107,6 +165,21 @@ def venta_dia(d):
 def tickets_dia(d):
     h = historico(d.year).get(d.isoformat()) or {}
     return {l: (v.get("tickets", 0) if isinstance(v, dict) else 0) for l, v in h.items()}
+
+
+def completar(rows, *grupos):
+    """USA no tiene locales nuevos ni descansos: completa los campos que el
+    diseño usa con sus valores 'neutros' (todo comparable, a igual base = total)."""
+    for r in rows:
+        r.setdefault("comparable", r["branch"] not in NUEVOS)
+        r.setdefault("cerrado", False)
+    for g in grupos:
+        if not g:
+            continue
+        for a, b in (("ca26", "a26"), ("ca25", "a25"), ("csem26", "sem26"), ("csem25", "sem25")):
+            if b in g:
+                g.setdefault(a, g[b])
+        g.setdefault("hay_nuevo", False)
 
 
 def mismo_dia_semana(d):
@@ -125,6 +198,7 @@ def espejo(d):
 
 # ============================================================= COMPONENTES ==
 def header(titulo, fecha_txt):
+    titulo = f"{titulo} · {REGION}"
     return f'''
  <table class="head" role="presentation"><tr>
    <td class="hl"><img src="cid:logo" alt="Lucciano's" width="120" class="logo"></td>
@@ -158,12 +232,12 @@ def hero(lbl, total, sub, celdas, propias_v, franquicias_v):
  <div class="sec">
   <div class="hero">
    <div class="hlbl">{lbl}</div>
-   <div class="big">{eur(total)}</div>
+   <div class="big">{plata(total)}</div>
    <div class="hsub">{sub}</div>
    <table class="strip" role="presentation"><tr>{"".join(c)}</tr></table>
    <table class="splitlbl" role="presentation"><tr>
-     <td class="spl"><span class="dot sp"></span>Propias <b class="wh">{eur(propias_v)}</b></td>
-     <td class="spr">Franquicias <b class="wh">{eur(franquicias_v)}</b><span class="dot sf dotr"></span></td>
+     <td class="spl"><span class="dot sp"></span>Propias <b class="wh">{plata(propias_v)}</b></td>
+     <td class="spr">Franquicias <b class="wh">{plata(franquicias_v)}</b><span class="dot sf dotr"></span></td>
    </tr></table>
    <table class="split" role="presentation"><tr><td class="sp spa" style="width:{wp:.1f}%"></td><td class="sf spb"></td></tr></table>
   </div>
@@ -177,15 +251,15 @@ def barra_partida(c26, nuevos, c25, lbl26, lbl25, nombres_nuevos):
     if nombres_nuevos and nuevos > 0:
         fila = (f'<td class="s-comp" style="width:{c26 / esc * 100:.2f}%"></td>'
                 f'<td class="s-new" style="width:{nuevos / esc * 100:.2f}%"></td><td class="s-bg"></td>')
-        ley = (f'<div class="legend"><span class="it"><span class="dot s-comp"></span>Con historia {eur(c26)}</span>'
-               f'<span class="it"><span class="dot s-new"></span>{lista(nombres_nuevos)} {eur(nuevos)}</span></div>')
+        ley = (f'<div class="legend"><span class="it"><span class="dot s-comp"></span>Con historia {plata(c26)}</span>'
+               f'<span class="it"><span class="dot s-new"></span>{lista(nombres_nuevos)} {plata(nuevos)}</span></div>')
     else:
         fila = f'<td class="s-comp" style="width:{c26 / esc * 100:.2f}%"></td><td class="s-bg"></td>'
         ley = ""
     return f'''
   <table class="av" role="presentation">
-   <tr><td class="yr">{lbl26}</td><td class="trk"><table class="track" role="presentation"><tr>{fila}</tr></table></td><td class="amt">{eur(tot)}</td></tr>
-   <tr><td class="yr mut">{lbl25}</td><td class="trk"><table class="track" role="presentation"><tr><td class="s-25" style="width:{c25 / esc * 100:.2f}%"></td><td class="s-bg"></td></tr></table></td><td class="amt mut">{eur(c25)}</td></tr>
+   <tr><td class="yr">{lbl26}</td><td class="trk"><table class="track" role="presentation"><tr>{fila}</tr></table></td><td class="amt">{plata(tot)}</td></tr>
+   <tr><td class="yr mut">{lbl25}</td><td class="trk"><table class="track" role="presentation"><tr><td class="s-25" style="width:{c25 / esc * 100:.2f}%"></td><td class="s-bg"></td></tr></table></td><td class="amt mut">{plata(c25)}</td></tr>
   </table>
   {ley}'''
 
@@ -225,7 +299,7 @@ def columnas(items, alto=96, ocultar_valores_celular=False):
         b25 = _barra("c25", (v25 or 0) / vmax * alto) if v25 is not None else ""
         sep = '<td class="csep"></td>' if v25 is not None else ""
         cls26 = "c26"
-        cols += (f'<td class="ccol"><div class="cval{ocultar}">{eur_corto(v26) if v26 else "—"}</div>'
+        cols += (f'<td class="ccol"><div class="cval{ocultar}">{plata_corta(v26) if v26 else "—"}</div>'
                  f'<table class="cbars" role="presentation" align="center"><tr>{b25}{sep}{_barra(cls26, (v26 or 0) / vmax * alto)}'
                  f'</tr></table><div class="clab{" b" if res else ""}">{et}</div></td>')
     return f'<table class="cols" role="presentation"><tr>{cols}</tr></table>'
@@ -266,23 +340,23 @@ def destacados(dif_b, c26, c25, nuevos_nombres, nuevos_monto, periodo, anio_ant)
         brecha = min(dif_b, key=dif_b.get)
         if dif_b[brecha] < 0 and c26 < c25:
             dest.append(("warn", f"<b>{brecha}</b> explica el {abs(dif_b[brecha]) / (c25 - c26) * 100:.0f}% "
-                                 f"de lo que falta para igualar {anio_ant} ({eur(dif_b[brecha])})."))
+                                 f"de lo que falta para igualar {anio_ant} ({plata(dif_b[brecha])})."))
         mejor = max(dif_b, key=dif_b.get)
         if c26 >= c25 and dif_b[mejor] > 0:
             dest.append(("warn", f"<b>{mejor}</b> es el que más suma contra {anio_ant}: "
-                                 f"{eur(dif_b[mejor], signo=True)}."))
+                                 f"{plata(dif_b[mejor], signo=True)}."))
     if nuevos_nombres and nuevos_monto > 0:
         q = f"<b>{lista(nuevos_nombres)}</b>"
         var = (c26 / c25 - 1) * 100 if c25 else 0
         tot = c26 + nuevos_monto
         if c26 < c25 <= tot:
             dest.append(("info", f"Sin {q} {periodo} viene {pct(var)}; con ellos, el total supera a "
-                                 f"{anio_ant} por {eur(tot - c25)}."))
+                                 f"{anio_ant} por {plata(tot - c25)}."))
         elif tot < c25:
-            dest.append(("info", f"Aun sumando {q} ({eur(nuevos_monto)}), el total queda "
-                                 f"{eur(c25 - tot)} abajo de {anio_ant}."))
+            dest.append(("info", f"Aun sumando {q} ({plata(nuevos_monto)}), el total queda "
+                                 f"{plata(c25 - tot)} abajo de {anio_ant}."))
         else:
-            dest.append(("info", f"{q} suman {eur(nuevos_monto)} extra sobre una base que ya viene {pct(var)}."))
+            dest.append(("info", f"{q} suman {plata(nuevos_monto)} extra sobre una base que ya viene {pct(var)}."))
     if not dest:
         return ""
     return ('<table class="dest" role="presentation">' +
@@ -299,7 +373,7 @@ def barras_horizontales(valores, total=None):
         v = valores[b]
         filas += (f'<tr><td class="hn">{b}</td><td class="hb"><table class="hbt" role="presentation" '
                   f'style="width:{max(v / vmax * 100, 1):.1f}%"><tr><td class="hbar"></td></tr></table></td>'
-                  f'<td class="hv">{eur_corto(v, euro=True)}<span class="mut hs"> · {v / total * 100:.0f}%</span></td></tr>')
+                  f'<td class="hv">{plata_corta(v, moneda=True)}<span class="mut hs"> · {v / total * 100:.0f}%</span></td></tr>')
     return f'<table class="hbars" role="presentation">{filas}</table>'
 
 

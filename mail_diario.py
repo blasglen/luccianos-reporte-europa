@@ -1,5 +1,5 @@
 """
-mail_diario.py — HTML del reporte DIARIO de Europa (diseño "combinado").
+mail_diario.py — HTML del reporte DIARIO (diseño "combinado", igual en Europa y USA).
 
 Lo llama report.py (build_report) con los numeros ya calculados. Este modulo
 solo DIBUJA: no toca el acumulado ni el historial. El estilo, los componentes y
@@ -22,8 +22,8 @@ compara con un viernes. Los ACUMULADOS siguen por fecha calendario.
 import calendar
 from datetime import timedelta
 
-from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, SIN_HISTORICO_2025, motivo_cierre
-from mail_base import (DIAS, DIAS_C, MESES, MES_C, eur, pct, num, chip, lista,
+from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS
+from mail_base import (NUEVOS, REGION, TXT_NETO, completar, motivo_cierre, DIAS, DIAS_C, MESES, MES_C, plata, pct, num, chip, lista,
                        venta_dia, tickets_dia, mismo_dia_semana, header, celda, celda_var,
                        hero, barra_partida, ritmo, divergente, destacados, tarjeta, pie,
                        documento)
@@ -32,9 +32,10 @@ from mail_base import (DIAS, DIAS_C, MESES, MES_C, eur, pct, num, chip, lista,
 def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
     """rows/totals/propias/franquicias: como los arma report.build_report.
     tickets: {local: tickets del dia} (de Ventas_ayer.xlsx)."""
+    completar(rows, totals, propias, franquicias)
     R = {r["branch"]: r for r in rows}
-    NUE = [b for b in BRANCH_ORDER if b in SIN_HISTORICO_2025]
-    COMP = [b for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025]
+    NUE = [b for b in BRANCH_ORDER if b in NUEVOS]
+    COMP = [b for b in BRANCH_ORDER if b not in NUEVOS]
     ant = fecha.year - 1
 
     dtot = totals["dia"]
@@ -45,9 +46,10 @@ def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
     ndias = calendar.monthrange(fecha.year, fecha.month)[1]
     mes_n = MESES[fecha.month]
 
-    # Tickets del mes (historico.py ya registro el dia de hoy antes de report.py)
-    tk_mes = sum(sum(tickets_dia(fecha.replace(day=i)).values()) for i in range(1, fecha.day + 1))
-    tk_mes = max(tk_mes, tkt)
+    # Tickets del mes (historico.py ya registro el dia de hoy antes de report.py).
+    # Si al historial le falta algun dia, no se muestran: quedarian cortos.
+    dias_tk = [tickets_dia(fecha.replace(day=i)) for i in range(1, fecha.day + 1)]
+    tk_mes = sum(sum(t.values()) for t in dias_tk) if all(dias_tk) else None
 
     # vs mismo dia de la semana pasada (todos los locales)
     sem = fecha - timedelta(days=7)
@@ -71,19 +73,19 @@ def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
     # ---- 2. venta de ayer
     bloque_dia = hero(
         f"Venta de ayer · {DIAS_C[fecha.weekday()]} {fecha.day:02d}/{fecha.month:02d}", dtot, sub,
-        [celda("Tickets", num(tkt), f"{num(tk_mes)} en el mes"),
-         celda("Ticket prom.", eur(dtot / tkt, 2) if tkt else "—",
-               f"{eur(tot / tk_mes, 2)} en el mes" if tk_mes else ""),
-         celda_var(f"vs {DIAS_C[sem.weekday()]} {sem.day}/{sem.month}", var_s, eur(dsem) if dsem else ""),
-         celda_var(f"vs {DIAS_C[f25.weekday()]} {f25.day}/{f25.month}/{f25.year}", var_a, "a igual base")],
+        [celda("Tickets", num(tkt), f"{num(tk_mes)} en el mes" if tk_mes else ""),
+         celda("Ticket prom.", plata(dtot / tkt, 2) if tkt else "—",
+               f"{plata(tot / tk_mes, 2)} en el mes" if tk_mes else ""),
+         celda_var(f"vs {DIAS_C[sem.weekday()]} {sem.day}/{sem.month}", var_s, plata(dsem) if dsem else ""),
+         celda_var(f"vs {DIAS_C[f25.weekday()]} {f25.day}/{f25.month}/{f25.year}", var_a, "a igual base" if NUE else "mismo día de la semana")],
         propias["dia"], franquicias["dia"])
 
     # ---- 3. acumulado del mes + dia por dia
     if NUE:
-        sub_mes = (f'<b class="{"pos-t" if c26 >= c25 else "neg-t"}">{eur(c26 - c25, signo=True)}</b> '
+        sub_mes = (f'<b class="{"pos-t" if c26 >= c25 else "neg-t"}">{plata(c26 - c25, signo=True)}</b> '
                    f'vs {mes_n} {ant} en los {len(COMP)} locales con historia, al mismo día')
     else:
-        sub_mes = (f'<b class="{"pos-t" if c26 >= c25 else "neg-t"}">{eur(c26 - c25, signo=True)}</b> '
+        sub_mes = (f'<b class="{"pos-t" if c26 >= c25 else "neg-t"}">{plata(c26 - c25, signo=True)}</b> '
                    f'vs {mes_n} {ant} al mismo día')
     items = []
     for i in range(1, fecha.day + 1):
@@ -97,7 +99,7 @@ def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
     bloque_mes = f'''
  <div class="sec">
   <table class="mh" role="presentation"><tr>
-    <td><div class="lbl">Acumulado de {mes_n}</div><div class="big2">{eur(tot)}</div></td>
+    <td><div class="lbl">Acumulado de {mes_n}</div><div class="big2">{plata(tot)}</div></td>
     <td class="mhr">{chip(var_m, "lg")}</td></tr></table>
   <div class="msub">{sub_mes}</div>
   {barra_partida(c26, nuevos, c25, f"{MES_C[fecha.month]}/{str(fecha.year)[2:]}", f"{MES_C[fecha.month]}/{str(ant)[2:]}", NUE)}
@@ -122,28 +124,28 @@ def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
         if r.get("cerrado"):
             linea, ayer = "cerrado por descanso", '<span class="mut it2">cerrado</span>'
         else:
-            linea = (f'{num(t)} tickets · <span class="nw">prom. {eur(r["dia"] / t, 2)}</span>'
+            linea = (f'{num(t)} tickets · <span class="nw">prom. {plata(r["dia"] / t, 2)}</span>'
                      if t else "sin tickets")
-            ayer = eur(r["dia"])
+            ayer = plata(r["dia"])
         if r["comparable"]:
-            sub25 = f'<div class="mut sm">vs {eur(r["a25"])}</div>'
+            sub25 = f'<div class="mut sm">vs {plata(r["a25"])}</div>'
             var = (f'{chip(r["pct"])}<div class="sm b {"pos-t" if r["diff"] >= 0 else "neg-t"}">'
-                   f'{eur(r["diff"], signo=True)}</div>')
+                   f'{plata(r["diff"], signo=True)}</div>')
         else:
             sub25, var = f'<div class="mut sm">sin {ant}</div>', '<span class="chip flat">nuevo</span>'
         return (f'<tr><td class="c-name"><div class="nm">{b}</div><div class="mut sm">{linea}</div></td>'
-                f'<td class="c-num">{ayer}</td><td class="c-acum"><div class="b">{eur(r["a26"])}</div>{sub25}</td>'
+                f'<td class="c-num">{ayer}</td><td class="c-acum"><div class="b">{plata(r["a26"])}</div>{sub25}</td>'
                 f'<td class="c-var">{var}</td></tr>')
 
     def subtotal(nombre, s, locs):
         st = sum(tickets.get(b, 0) for b in locs)
         ast = "*" if s.get("hay_nuevo") else ""
         return (f'<tr><td class="c-name sub subl"><div class="nm">{nombre}</div>'
-                f'<div class="mut sm">{f"prom. {eur(s["dia"] / st, 2)}" if st else ""}</div></td>'
-                f'<td class="c-num sub">{eur(s["dia"])}</td>'
-                f'<td class="c-acum sub"><div class="b">{eur(s["a26"])}</div><div class="mut sm">vs {eur(s["ca25"])}{ast}</div></td>'
+                f'<div class="mut sm">{f"prom. {plata(s["dia"] / st, 2)}" if st else ""}</div></td>'
+                f'<td class="c-num sub">{plata(s["dia"])}</td>'
+                f'<td class="c-acum sub"><div class="b">{plata(s["a26"])}</div><div class="mut sm">vs {plata(s["ca25"])}{ast}</div></td>'
                 f'<td class="c-var sub subr">{chip(s["pct"])}<div class="sm b {"pos-t" if s["diff"] >= 0 else "neg-t"}">'
-                f'{eur(s["diff"], signo=True)}</div></td></tr>')
+                f'{plata(s["diff"], signo=True)}</div></td></tr>')
 
     grupo = lambda t: f'<tr><td colspan="4" class="grp">{t}</td></tr>'
     filas = (grupo("Propias") + "".join(fila(b) for b in PROPIAS) + subtotal("Subtotal propias", propias, PROPIAS) +
@@ -158,19 +160,19 @@ def render(fecha, rows, totals, propias, franquicias, tickets, base_dir=None):
    {filas}
   </table>
   <table class="tot" role="presentation"><tr>
-   <td class="tt"><div>Total general</div><div class="ts">{f"prom. {eur(dtot / tkt, 2)}" if tkt else ""}</div></td>
-   <td class="tt r c-num">{eur(dtot)}</td>
-   <td class="tt r"><div>{eur(tot)}</div><div class="ts">vs {eur(c25)}{ast}</div></td>
-   <td class="tt r tv">{chip(var_m, "inv")}<div class="ts {"pos-tot" if c26 >= c25 else "neg-tot"}">{eur(c26 - c25, signo=True)}</div></td>
+   <td class="tt"><div>Total general</div><div class="ts">{f"prom. {plata(dtot / tkt, 2)}" if tkt else ""}</div></td>
+   <td class="tt r c-num">{plata(dtot)}</td>
+   <td class="tt r"><div>{plata(tot)}</div><div class="ts">vs {plata(c25)}{ast}</div></td>
+   <td class="tt r tv">{chip(var_m, "inv")}<div class="ts {"pos-tot" if c26 >= c25 else "neg-tot"}">{plata(c26 - c25, signo=True)}</div></td>
   </tr></table>
   {_notas(fecha, rows, NUE)}
  </div>'''
 
-    card = tarjeta(header("Reporte diario · Europa",
+    card = tarjeta(header("Reporte diario",
                           f"{DIAS[fecha.weekday()]} {fecha.day} de {mes_n} de {fecha.year}"),
                    bloque_dia, bloque_mes, bloque_var, bloque_tabla,
-                   pie=pie(f"Lucciano's Europa · Ventas netas sin IVA · Datos al {fecha.strftime('%d/%m/%Y')}"))
-    pre = f"Ayer {eur(dtot)} · {mes_n.capitalize()} {pct(var_m)} vs {ant}" + (" en locales con historia" if NUE else "")
+                   pie=pie(f"Lucciano's {REGION} · {TXT_NETO} · Datos al {fecha.strftime('%d/%m/%Y')}"))
+    pre = f"Ayer {plata(dtot)} · {mes_n.capitalize()} {pct(var_m)} vs {ant}" + (" en locales con historia" if NUE else "")
     return documento(card, f"Reporte diario {fecha.strftime('%d/%m/%Y')}", pre)
 
 

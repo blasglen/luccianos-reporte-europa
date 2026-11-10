@@ -1,5 +1,5 @@
 """
-mail_cierre.py — HTML del CIERRE MENSUAL de Europa (diseño "combinado").
+mail_cierre.py — HTML del CIERRE MENSUAL (diseño "combinado", igual en Europa y USA).
 
 Lo llama report_cierre.py con los numeros ya calculados (construir() + YTD).
 Solo dibuja. Estilo, componentes e inliner: mail_base.py.
@@ -13,8 +13,8 @@ Estructura:
   5. Tabla por sucursal (con participacion y ticket promedio)
   6. Acumulado del anio: total, barra partida, venta mes a mes, por sucursal
 """
-from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, SIN_HISTORICO_2025
-from mail_base import (MESES, MES_C, eur, pct, num, chip, flecha_pct, lista, header, celda,
+from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS
+from mail_base import (SEP_DEC, NUEVOS, REGION, TXT_NETO, completar, MESES, MES_C, plata, pct, num, chip, flecha_pct, lista, header, celda,
                        celda_var, hero, barra_partida, columnas, divergente, destacados, callout,
                        tarjeta, pie, documento)
 
@@ -27,9 +27,10 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
       serie_meses: [(etiqueta, venta_anio, venta_anio_anterior)] de enero al mes cerrado
       mes_prev:    (etiqueta, venta total del mes anterior) o None
     """
+    completar(rows, totals, propias, franquicias)
     R = {r["branch"]: r for r in rows}
-    NUE = [b for b in BRANCH_ORDER if b in SIN_HISTORICO_2025]
-    COMP = [b for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025]
+    NUE = [b for b in BRANCH_ORDER if b in NUEVOS]
+    COMP = [b for b in BRANCH_ORDER if b not in NUEVOS]
     anio, mes = ultimo.year, ultimo.month
     ant = anio - 1
     mes_n = MESES[mes]
@@ -53,18 +54,18 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
 
     if mes_prev and mes_prev[1]:
         var_prev = (tot / mes_prev[1] - 1) * 100
-        c3 = celda_var(f"vs {mes_prev[0]}", var_prev, eur(mes_prev[1]))
+        c3 = celda_var(f"vs {mes_prev[0]}", var_prev, plata(mes_prev[1]))
     else:
         c3 = celda_var("vs mes anterior", None, "")
 
     bloque_mes = hero(
         f"Venta de {mes_n} {anio}", tot,
-        f"{ndias} días · promedio {eur(tot / ndias)} por día",
+        f"{ndias} días · promedio {plata(tot / ndias)} por día",
         [celda("Tickets", num(tks) if con_tks else "—", f"{flecha_pct(var_tk)} vs {ant}" if var_tk is not None else ""),
-         celda("Ticket prom.", eur(tp, 2) if (con_tks and tks) else "—",
+         celda("Ticket prom.", plata(tp, 2) if (con_tks and tks) else "—",
                f"{flecha_pct(var_tp)} vs {ant}" if var_tp is not None else ""),
          c3,
-         celda_var(f"vs {MES_C[mes].lower()} {ant}", var_m, "a igual base")],
+         celda_var(f"vs {MES_C[mes].lower()} {ant}", var_m, "a igual base" if NUE else "mismo mes")],
         propias["a26"], franquicias["a26"])
 
     # ---- 3+4. calendario + variacion por sucursal
@@ -81,26 +82,26 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
     # ---- 5. tabla
     def fila(b):
         r = R[b]
-        partes = [f'{r.get("share", 0):.1f}'.replace(".", ",") + "% del total"]
+        partes = [f'{r.get("share", 0):.1f}'.replace(".", SEP_DEC) + "% del total"]
         if con_tks and r.get("tp26"):
-            partes.append(f'<span class="nw">prom. {eur(r["tp26"], 2)}</span>')
+            partes.append(f'<span class="nw">prom. {plata(r["tp26"], 2)}</span>')
         if r["comparable"]:
-            sub25 = f'<div class="mut sm">vs {eur(r["a25"])}</div>'
+            sub25 = f'<div class="mut sm">vs {plata(r["a25"])}</div>'
             var = (f'{chip(r["pct"])}<div class="sm b {"pos-t" if r["diff"] >= 0 else "neg-t"}">'
-                   f'{eur(r["diff"], signo=True)}</div>')
+                   f'{plata(r["diff"], signo=True)}</div>')
         else:
             sub25, var = f'<div class="mut sm">sin {ant}</div>', '<span class="chip flat">nuevo</span>'
         return (f'<tr><td class="c-name"><div class="nm">{b}</div><div class="mut sm">{" · ".join(partes)}</div></td>'
-                f'<td class="c-acum"><div class="b">{eur(r["a26"])}</div>{sub25}</td>'
+                f'<td class="c-acum"><div class="b">{plata(r["a26"])}</div>{sub25}</td>'
                 f'<td class="c-var">{var}</td></tr>')
 
     def subtotal(nombre, s):
         ast = "*" if s.get("hay_nuevo") else ""
-        part = f'{s["a26"] / tot * 100:.1f}'.replace(".", ",") + "% del total" if tot else ""
+        part = f'{s["a26"] / tot * 100:.1f}'.replace(".", SEP_DEC) + "% del total" if tot else ""
         return (f'<tr><td class="c-name sub subl"><div class="nm">{nombre}</div><div class="mut sm">{part}</div></td>'
-                f'<td class="c-acum sub"><div class="b">{eur(s["a26"])}</div><div class="mut sm">vs {eur(s["ca25"])}{ast}</div></td>'
+                f'<td class="c-acum sub"><div class="b">{plata(s["a26"])}</div><div class="mut sm">vs {plata(s["ca25"])}{ast}</div></td>'
                 f'<td class="c-var sub subr">{chip(s["pct"])}<div class="sm b {"pos-t" if s["diff"] >= 0 else "neg-t"}">'
-                f'{eur(s["diff"], signo=True)}</div></td></tr>')
+                f'{plata(s["diff"], signo=True)}</div></td></tr>')
 
     grupo = lambda t: f'<tr><td colspan="3" class="grp">{t}</td></tr>'
     filas = (grupo("Propias") + "".join(fila(b) for b in PROPIAS) + subtotal("Subtotal propias", propias) +
@@ -119,9 +120,9 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
    {filas}
   </table>
   <table class="tot" role="presentation"><tr>
-   <td class="tt"><div>Total {MES_C[mes].lower()}/{str(anio)[2:]}</div><div class="ts">{f"prom. {eur(tp, 2)}" if (con_tks and tks) else ""}</div></td>
-   <td class="tt r"><div>{eur(tot)}</div><div class="ts">vs {eur(c25)}{ast}</div></td>
-   <td class="tt r tv">{chip(var_m, "inv")}<div class="ts {"pos-tot" if c26 >= c25 else "neg-tot"}">{eur(c26 - c25, signo=True)}</div></td>
+   <td class="tt"><div>Total {MES_C[mes].lower()}/{str(anio)[2:]}</div><div class="ts">{f"prom. {plata(tp, 2)}" if (con_tks and tks) else ""}</div></td>
+   <td class="tt r"><div>{plata(tot)}</div><div class="ts">vs {plata(c25)}{ast}</div></td>
+   <td class="tt r tv">{chip(var_m, "inv")}<div class="ts {"pos-tot" if c26 >= c25 else "neg-tot"}">{plata(c26 - c25, signo=True)}</div></td>
   </tr></table>
   {"".join(f'<div class="nota">{n}</div>' for n in notas)}
  </div>'''
@@ -135,9 +136,9 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
         yc25 = sum(p25.get(b, 0) for b in COMP)
         ynue = y26 - yc26
         rango = f"enero a {mes_n}" if mes > 1 else "enero"
-        sub_y = (f'<b class="{"pos-t" if yc26 >= yc25 else "neg-t"}">{eur(yc26 - yc25, signo=True)}</b> '
+        sub_y = (f'<b class="{"pos-t" if yc26 >= yc25 else "neg-t"}">{plata(yc26 - yc25, signo=True)}</b> '
                  f'vs {rango} {ant}' + (f' en los {len(COMP)} locales con historia' if NUE else '') +
-                 (f' · {num(ytd["tks"])} tickets, prom. {eur(ytd["tp"], 2)}' if ytd.get("tks") else ""))
+                 (f' · {num(ytd["tks"])} tickets, prom. {plata(ytd["tp"], 2)}' if ytd.get("tks") else ""))
         cols = ""
         if serie_meses:
             cols = f'''
@@ -148,22 +149,22 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
         filas_y = ""
         for b in sorted(BRANCH_ORDER, key=lambda x: p26.get(x, 0), reverse=True):
             v = p26.get(b, 0)
-            share = f"{v / y26 * 100:.1f}".replace(".", ",") + "% del total" if y26 else ""
-            if b in SIN_HISTORICO_2025 or not p25.get(b):
+            share = f"{v / y26 * 100:.1f}".replace(".", SEP_DEC) + "% del total" if y26 else ""
+            if b in NUEVOS or not p25.get(b):
                 var = '<span class="chip flat">nuevo</span>'
                 sub25 = f'<div class="mut sm">sin {ant}</div>'
             else:
                 d = v - p25[b]
                 var = (f'{chip((v / p25[b] - 1) * 100)}<div class="sm b {"pos-t" if d >= 0 else "neg-t"}">'
-                       f'{eur(d, signo=True)}</div>')
-                sub25 = f'<div class="mut sm">vs {eur(p25[b])}</div>'
+                       f'{plata(d, signo=True)}</div>')
+                sub25 = f'<div class="mut sm">vs {plata(p25[b])}</div>'
             filas_y += (f'<tr><td class="c-name"><div class="nm">{b}</div><div class="mut sm">{share}</div></td>'
-                        f'<td class="c-acum"><div class="b">{eur(v)}</div>{sub25}</td><td class="c-var">{var}</td></tr>')
+                        f'<td class="c-acum"><div class="b">{plata(v)}</div>{sub25}</td><td class="c-var">{var}</td></tr>')
 
         bloque_anio = f'''
  <div class="sec">
   <table class="mh" role="presentation"><tr>
-    <td><div class="lbl">Acumulado del año · {rango} {anio}</div><div class="big2">{eur(y26)}</div></td>
+    <td><div class="lbl">Acumulado del año · {rango} {anio}</div><div class="big2">{plata(y26)}</div></td>
     <td class="mhr">{chip(ytd["pct"], "lg")}</td></tr></table>
   <div class="msub">{sub_y}</div>
   {barra_partida(yc26, ynue, yc25, str(anio), str(ant), NUE)}
@@ -176,9 +177,9 @@ def render(dia1, ultimo, rows, totals, propias, franquicias, ia, fa, con_tks, yt
   <div class="nota">Acumulado del año calendario a la misma fecha en los dos años: lo que va de {anio} contra lo que iba de {ant} a esta altura.</div>
  </div>'''
 
-    card = tarjeta(header("Cierre mensual · Europa", f"{mes_n.capitalize()} {anio}"),
+    card = tarjeta(header("Cierre mensual", f"{mes_n.capitalize()} {anio}"),
                    bloque_mes, bloque_var, bloque_tabla, bloque_anio,
-                   pie=pie(f"Lucciano's Europa · Ventas netas sin IVA · {mes_n.capitalize()} {anio}"))
-    pre = (f"{mes_n.capitalize()} {eur(tot)} · {pct(var_m)} vs {ant}" + (" a igual base" if NUE else "") +
+                   pie=pie(f"Lucciano's {REGION} · {TXT_NETO} · {mes_n.capitalize()} {anio}"))
+    pre = (f"{mes_n.capitalize()} {plata(tot)} · {pct(var_m)} vs {ant}" + (" a igual base" if NUE else "") +
            (f" · Año {pct(ytd['pct'])}" if ytd else ""))
     return documento(card, f"Cierre mensual {mes_n} {anio}", pre)

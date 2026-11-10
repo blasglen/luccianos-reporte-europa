@@ -1,5 +1,5 @@
 """
-mail_semanal.py — HTML del reporte SEMANAL de Europa (diseño "combinado").
+mail_semanal.py — HTML del reporte SEMANAL (diseño "combinado", igual en Europa y USA).
 
 Lo llama report_semanal.py con los numeros ya calculados (construir()). Solo
 dibuja. Estilo, componentes e inliner: mail_base.py.
@@ -16,8 +16,8 @@ Estructura:
 """
 from datetime import timedelta
 
-from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS, SIN_HISTORICO_2025, cerrado_por_descanso
-from mail_base import (DIAS_C, MESES, MES_C, eur, pct, num, chip, flecha_pct, lista,
+from report import BRANCH_ORDER, PROPIAS, FRANQUICIAS
+from mail_base import (NUEVOS, REGION, TXT_NETO, completar, cerrado_por_descanso, DIAS_C, MESES, MES_C, plata, pct, num, chip, flecha_pct, lista,
                        venta_dia, mismo_dia_semana, header, celda, celda_var, hero,
                        barra_partida, columnas, divergente, destacados, barras_horizontales,
                        tarjeta, pie, documento, historico)
@@ -33,9 +33,10 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
            v12_hasta=None):
     """Mismos argumentos que el render_html viejo de report_semanal.py.
     v12_hasta: (anio, mes) del ultimo mes cerrado que suma v12 (para el titulo)."""
+    completar(rows, totals, propias, franquicias)
     R = {r["branch"]: r for r in rows}
-    NUE = [b for b in BRANCH_ORDER if b in SIN_HISTORICO_2025]
-    COMP = [b for b in BRANCH_ORDER if b not in SIN_HISTORICO_2025]
+    NUE = [b for b in BRANCH_ORDER if b in NUEVOS]
+    COMP = [b for b in BRANCH_ORDER if b not in NUEVOS]
     ant = hasta.year - 1
 
     s26 = totals["sem26"]
@@ -64,11 +65,11 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
     bloque_sem = hero(
         f"Venta de la semana · {DIAS_C[desde.weekday()]} {desde.day}/{desde.month} al "
         f"{DIAS_C[hasta.weekday()]} {hasta.day}/{hasta.month}",
-        s26, f"Promedio {eur(s26 / 7)} por día · {len(rows)} sucursales",
+        s26, f"Promedio {plata(s26 / 7)} por día · {len(rows)} sucursales",
         [celda("Tickets", num(tks) if not sin_tks else "—", sub_tk),
-         celda("Ticket prom.", eur(tp, 2) if (tks and not sin_tks) else "—", sub_tp),
-         celda_var(f"vs {pd.day}/{pd.month} al {ph.day}/{ph.month}", var_prev, eur(sprev) if sprev else ""),
-         celda_var(f"vs {ant}", var_sem, "misma semana, igual base")],
+         celda("Ticket prom.", plata(tp, 2) if (tks and not sin_tks) else "—", sub_tp),
+         celda_var(f"vs {pd.day}/{pd.month} al {ph.day}/{ph.month}", var_prev, plata(sprev) if sprev else ""),
+         celda_var(f"vs {ant}", var_sem, "misma semana, igual base" if NUE else "misma semana")],
         propias["sem26"], franquicias["sem26"])
 
     # ---- 3. dia por dia
@@ -96,7 +97,7 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
     bloque_dias = f'''
  <div class="sec">
   <div class="h">Día por día</div>
-  <div class="hsubt">Mejor día: <b>{DIAS_C[mejor["fecha"].weekday()]} {mejor["fecha"].day}</b> con {eur(mejor["actual"])} · Más flojo: <b>{DIAS_C[peor["fecha"].weekday()]} {peor["fecha"].day}</b> con {eur(peor["actual"])} · Promedio {eur(prom)}</div>
+  <div class="hsubt">Mejor día: <b>{DIAS_C[mejor["fecha"].weekday()]} {mejor["fecha"].day}</b> con {plata(mejor["actual"])} · Más flojo: <b>{DIAS_C[peor["fecha"].weekday()]} {peor["fecha"].day}</b> con {plata(peor["actual"])} · Promedio {plata(prom)}</div>
   {columnas(items, 96)}
   <div class="legend"><span class="it"><span class="dot c26"></span>{hasta.year}</span><span class="it"><span class="dot c25"></span>Mismo día de la semana de {ant}</span></div>
   {"".join(f'<div class="nota">{n}</div>' for n in nota_dias)}
@@ -116,13 +117,13 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
     # ---- 5. acumulado del mes
     a26, ca26, ca25 = totals["a26"], totals["ca26"], totals["ca25"]
     mes_n = MESES[hasta.month]
-    sub_mes = (f'<b class="{"pos-t" if ca26 >= ca25 else "neg-t"}">{eur(ca26 - ca25, signo=True)}</b> '
+    sub_mes = (f'<b class="{"pos-t" if ca26 >= ca25 else "neg-t"}">{plata(ca26 - ca25, signo=True)}</b> '
                f'vs {mes_n} {ant}' + (f' en los {len(COMP)} locales con historia' if NUE else '') +
                f', del {dia1.day} al {hasta.day}')
     bloque_mes = f'''
  <div class="sec">
   <table class="mh" role="presentation"><tr>
-    <td><div class="lbl">Acumulado de {mes_n}</div><div class="big2">{eur(a26)}</div></td>
+    <td><div class="lbl">Acumulado de {mes_n}</div><div class="big2">{plata(a26)}</div></td>
     <td class="mhr">{chip(totals["pct"], "lg")}</td></tr></table>
   <div class="msub">{sub_mes}</div>
   {barra_partida(ca26, a26 - ca26, ca25, f"{MES_C[hasta.month]}/{str(hasta.year)[2:]}", f"{MES_C[hasta.month]}/{str(ant)[2:]}", NUE)}
@@ -132,29 +133,29 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
     def fila(b):
         r = R[b]
         t = r["tks26"]
-        linea = (f'{num(t)} tickets · <span class="nw">prom. {eur(r["sem26"] / t, 2)}</span>'
+        linea = (f'{num(t)} tickets · <span class="nw">prom. {plata(r["sem26"] / t, 2)}</span>'
                  if (t and not sin_tks) else "")
         if r["comparable"]:
-            sub25 = f'<div class="mut sm">vs {eur(r["sem25"])}</div>'
+            sub25 = f'<div class="mut sm">vs {plata(r["sem25"])}</div>'
             var = (f'{chip(r["sem_pct"])}<div class="sm b {"pos-t" if r["sem_diff"] >= 0 else "neg-t"}">'
-                   f'{eur(r["sem_diff"], signo=True)}</div>')
+                   f'{plata(r["sem_diff"], signo=True)}</div>')
             mes_v = f'<div class="sm b {"pos-t" if r["diff"] >= 0 else "neg-t"}">{pct(r["pct"])}</div>'
         else:
             sub25, var = f'<div class="mut sm">sin {ant}</div>', '<span class="chip flat">nuevo</span>'
             mes_v = '<div class="mut sm">nuevo</div>'
         return (f'<tr><td class="c-name"><div class="nm">{b}</div><div class="mut sm">{linea}</div></td>'
-                f'<td class="c-acum"><div class="b">{eur(r["sem26"])}</div>{sub25}</td>'
+                f'<td class="c-acum"><div class="b">{plata(r["sem26"])}</div>{sub25}</td>'
                 f'<td class="c-var">{var}</td>'
-                f'<td class="c-num"><div>{eur(r["a26"])}</div>{mes_v}</td></tr>')
+                f'<td class="c-num"><div>{plata(r["a26"])}</div>{mes_v}</td></tr>')
 
     def subtotal(nombre, s):
         ast = "*" if s.get("hay_nuevo") else ""
-        prom_g = f"prom. {eur(s['tp26'], 2)}" if (s.get("tks26") and not sin_tks) else ""
+        prom_g = f"prom. {plata(s['tp26'], 2)}" if (s.get("tks26") and not sin_tks) else ""
         return (f'<tr><td class="c-name sub subl"><div class="nm">{nombre}</div><div class="mut sm">{prom_g}</div></td>'
-                f'<td class="c-acum sub"><div class="b">{eur(s["sem26"])}</div><div class="mut sm">vs {eur(s["csem25"])}{ast}</div></td>'
+                f'<td class="c-acum sub"><div class="b">{plata(s["sem26"])}</div><div class="mut sm">vs {plata(s["csem25"])}{ast}</div></td>'
                 f'<td class="c-var sub">{chip(s["sem_pct"])}<div class="sm b {"pos-t" if s["sem_diff"] >= 0 else "neg-t"}">'
-                f'{eur(s["sem_diff"], signo=True)}</div></td>'
-                f'<td class="c-num sub subr"><div>{eur(s["a26"])}</div>'
+                f'{plata(s["sem_diff"], signo=True)}</div></td>'
+                f'<td class="c-num sub subr"><div>{plata(s["a26"])}</div>'
                 f'<div class="sm b {"pos-t" if s["diff"] >= 0 else "neg-t"}">{pct(s["pct"])}{ast}</div></td></tr>')
 
     grupo = lambda t: f'<tr><td colspan="4" class="grp">{t}</td></tr>'
@@ -169,10 +170,10 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
    {filas}
   </table>
   <table class="tot" role="presentation"><tr>
-   <td class="tt"><div>Total general</div><div class="ts">{f"prom. {eur(tp, 2)}" if (tks and not sin_tks) else ""}</div></td>
-   <td class="tt r"><div>{eur(s26)}</div><div class="ts">vs {eur(cs25)}{ast}</div></td>
-   <td class="tt r tv">{chip(var_sem, "inv")}<div class="ts {"pos-tot" if cs26 >= cs25 else "neg-tot"}">{eur(cs26 - cs25, signo=True)}</div></td>
-   <td class="tt r c-num"><div>{eur(a26)}</div><div class="ts {"pos-tot" if ca26 >= ca25 else "neg-tot"}">{pct(totals["pct"])}{ast}</div></td>
+   <td class="tt"><div>Total general</div><div class="ts">{f"prom. {plata(tp, 2)}" if (tks and not sin_tks) else ""}</div></td>
+   <td class="tt r"><div>{plata(s26)}</div><div class="ts">vs {plata(cs25)}{ast}</div></td>
+   <td class="tt r tv">{chip(var_sem, "inv")}<div class="ts {"pos-tot" if cs26 >= cs25 else "neg-tot"}">{plata(cs26 - cs25, signo=True)}</div></td>
+   <td class="tt r c-num"><div>{plata(a26)}</div><div class="ts {"pos-tot" if ca26 >= ca25 else "neg-tot"}">{pct(totals["pct"])}{ast}</div></td>
   </tr></table>
  </div>'''
 
@@ -188,7 +189,7 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
         bloque_12 = f'''
  <div class="sec">
   <table class="mh" role="presentation"><tr>
-    <td><div class="lbl">Últimos 12 meses cerrados{f" · {tit}" if tit else ""}</div><div class="big2">{eur(sum(v12.values()))}</div></td></tr></table>
+    <td><div class="lbl">Últimos 12 meses cerrados{f" · {tit}" if tit else ""}</div><div class="big2">{plata(sum(v12.values()))}</div></td></tr></table>
   <div class="msub">Venta de cada sucursal en el último año móvil y su peso sobre el total. No se compara contra nada: es la escala de cada local.</div>
   {barras_horizontales(v12)}
  </div>'''
@@ -209,10 +210,10 @@ def render(desde, hasta, rows, totals, propias, franquicias, serie, mejor, peor,
     bloque_tabla = (bloque_tabla[:-len(cierre_div)] +
                     "".join(f'<div class="nota">{n}</div>' for n in notas) + cierre_div)
 
-    card = tarjeta(header("Reporte semanal · Europa", _rango_txt(desde, hasta)),
+    card = tarjeta(header("Reporte semanal", _rango_txt(desde, hasta)),
                    bloque_sem, bloque_dias, bloque_var, bloque_mes, bloque_tabla, bloque_12,
-                   pie=pie(f"Lucciano's Europa · Ventas netas sin IVA · Semana del {desde.strftime('%d/%m')} "
+                   pie=pie(f"Lucciano's {REGION} · {TXT_NETO} · Semana del {desde.strftime('%d/%m')} "
                            f"al {hasta.strftime('%d/%m/%Y')}"))
-    pre = (f"Semana {eur(s26)} · {pct(var_sem)} vs {ant}" + (" a igual base" if NUE else "") +
+    pre = (f"Semana {plata(s26)} · {pct(var_sem)} vs {ant}" + (" a igual base" if NUE else "") +
            f" · {MESES[hasta.month].capitalize()} {pct(totals['pct'])}")
     return documento(card, f"Reporte semanal {desde.strftime('%d/%m')} al {hasta.strftime('%d/%m/%Y')}", pre)
