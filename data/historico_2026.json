@@ -12196,5 +12196,43 @@
       "venta": 156.27,
       "tickets": 24
     }
+  },
+  "2026-11-18": {
+    "Barcelona 1": {
+      "venta": 2673.21,
+      "tickets": 335
+    },
+    "Barcelona 2": {
+      "venta": 706.82,
+      "tickets": 95
+    },
+    "Madrid": {
+      "venta": 595.55,
+      "tickets": 71
+    },
+    "Roma": {
+      "venta": 2152.0,
+      "tickets": 255
+    },
+    "Málaga 1": {
+      "venta": 1521.86,
+      "tickets": 218
+    },
+    "Málaga 3": {
+      "venta": 466.33,
+      "tickets": 74
+    },
+    "Valencia": {
+      "venta": 1817.92,
+      "tickets": 260
+    },
+    "Alicante": {
+      "venta": 1500.23,
+      "tickets": 172
+    },
+    "Granada": {
+      "venta": 330.95,
+      "tickets": 44
+    }
   }
 }
